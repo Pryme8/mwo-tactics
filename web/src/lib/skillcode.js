@@ -1,13 +1,57 @@
 // Picks skill tree nodes for a build and turns them into the code the in-game Skills
 // screen accepts under Import.
 //
-// Code format (from Kitlaan's open-source skill planner, which reads and writes the game's
-// codes): the letter 'a', then 60 hex digits = 30 bytes = one bit per node, lowest bit of
-// each byte first. Node N is the Nth <Node> of MechSkillTreeNodesDisplay.xml, which the
-// scanner stores untouched as db.skillNodes.
-
+// Code format: the letter 'a', then 60 hex digits = 240 bits, one per node, highest bit of
+// each digit first. Which bit is which node is fixed by the game and is not in its data
+// files; the table below comes from Kitlaan's open-source skill planner (node ids from the
+// older tree layout, which the game kept when the tree was rearranged) and was checked
+// against a code exported from game build 1.4.343.0.
 export const MAX_NODES = 91;
-const CODE_BYTES = 30;
+const CODE_BITS = 240;
+
+// bit number -> node name
+export const SKILL_BITS = [
+  'Velocity2', 'Range5', 'Velocity1', 'Range4', 'Cooldown1', 'Range3',
+  'Range2', 'Range1', 'GaussCharge1', 'Cooldown4', 'HighExplosive1', 'HeatGen1',
+  'Cooldown3', 'Range7', 'Cooldown2', 'Range6', 'HeatGen3', 'Velocity3',
+  'MissileSpread1', 'Cooldown7', 'Range9', 'Range8', 'Cooldown5', 'HeatGen2',
+  'Range10', 'Cooldown8', 'LBXSpread1', 'Velocity4', 'HeatGen4', 'Range12',
+  'Cooldown6', 'Range11', 'MissileRack1', 'Range13', 'HeatGen8', 'HeatGen6',
+  'HighExplosive2', 'HeatGen5', 'Cooldown10', 'UACJamChance1', 'Cooldown11', 'HeatGen7',
+  'GaussCharge2', 'Cooldown9', 'HeatGen9', 'Range14', 'MagazineCapacity1', 'LaserDuration1',
+  'LaserDuration3', 'Cooldown14', 'Velocity5', 'Cooldown12', 'Range15', 'Cooldown13',
+  'LaserDuration2', 'MissileRack2', 'LBXSpread2', 'HeatGen12', 'UACJamChance2', 'Cooldown15',
+  'MissileSpread2', 'HeatGen11', 'HeatGen10', 'MagazineCapacity2', 'ReinforcedCasing2', 'AMSOverload1',
+  'ShockAbsorbance1', 'ReinforcedCasing1', 'HeatGen14', 'LaserDuration4', 'HeatGen13', 'Cooldown16',
+  'ShockAbsorbance4', 'SkeletalDensity2', 'ShockAbsorbance3', 'AMSOverload2', 'ArmorHardening1', 'ShockAbsorbance2',
+  'ReinforcedCasing3', 'SkeletalDensity1', 'ArmorHardening4', 'ArmorHardening3', 'ReinforcedCasing7', 'ReinforcedCasing4',
+  'SkeletalDensity4', 'SkeletalDensity3', 'ReinforcedCasing5', 'ArmorHardening2', 'SkeletalDensity9', 'ArmorHardening6',
+  'SkeletalDensity7', 'SkeletalDensity6', 'ReinforcedCasing8', 'SkeletalDensity5', 'ReinforcedCasing6', 'ArmorHardening5',
+  'KineticBurst1', 'ArmorHardening8', 'ArmorHardening10', 'ShockAbsorbance5', 'ArmorHardening9', 'ArmorHardening7',
+  'SkeletalDensity8', 'SkeletalDensity10', 'TorsoYaw2', 'HardBrake3', 'KineticBurst2', 'TorsoYaw3',
+  'HardBrake2', 'TorsoSpeed1', 'HardBrake1', 'TorsoYaw1', 'TorsoSpeed2', 'KineticBurst6',
+  'KineticBurst4', 'KineticBurst5', 'TorsoYaw4', 'KineticBurst3', 'HardBrake4', 'AnchorTurn1',
+  'HardBrake5', 'AnchorTurn2', 'KineticBurst7', 'TorsoPitch3', 'TorsoPitch1', 'TorsoPitch2',
+  'TorsoSpeed3', 'TorsoYaw5', 'TorsoPitch4', 'SpeedTweak1', 'AnchorTurn4', 'HardBrake7',
+  'TorsoSpeed5', 'TorsoSpeed4', 'HardBrake6', 'AnchorTurn3', 'HeatShielding1', 'SpeedTweak5',
+  'AnchorTurn5', 'SpeedTweak4', 'SpeedTweak3', 'TorsoSpeed6', 'SpeedTweak2', 'TorsoPitch5',
+  'HeatShielding3', 'VentCalibration3', 'LiftSpeed1', 'Vectoring2', 'HeatShielding2', 'VentCalibration2',
+  'Vectoring1', 'VentCalibration1', 'VentCalibration5', 'LiftSpeed4', 'Vectoring4', 'HeatShielding4',
+  'VentCalibration4', 'LiftSpeed3', 'LiftSpeed2', 'Vectoring3', 'HeatContainment1', 'HillClimb1',
+  'ImprovedGyros1', 'SpeedRetention1', 'QuickIgnition1', 'LiftSpeed5', 'Vectoring5', 'HeatShielding5',
+  'QuickIgnition2', 'CoolRun2', 'HeatContainment3', 'SpeedRetention2', 'HillClimb2', 'HeatContainment2',
+  'CoolRun1', 'ImprovedGyros2', 'SpeedRetention3', 'QuickIgnition4', 'ImprovedGyros4', 'HeatContainment4',
+  'QuickIgnition3', 'ImprovedGyros3', 'CoolRun3', 'HillClimb3', 'TargetRetention1', 'SensorRange1',
+  'TargetDecay1', 'TargetInfoGathering1', 'CoolRun5', 'QuickIgnition5', 'CoolRun4', 'HeatContainment5',
+  'TargetRetention2', 'TargetDecay2', 'TargetInfoGathering4', 'AdvancedZoom', 'TargetInfoGathering2', 'SensorRange3',
+  'SensorRange2', 'TargetInfoGathering3', 'TargetInfoGathering5', 'RadarDeprivation2', 'EnhancedECM1', 'SeismicSensor1',
+  'TargetDecay3', 'SensorRange5', 'SensorRange4', 'RadarDeprivation1', 'ConsumableSlot1', 'RadarDeprivation5',
+  'RadarDeprivation4', 'SeismicSensor2', 'EnhancedECM2', 'RadarDeprivation3', 'TargetDecay5', 'TargetDecay4',
+  'ExtendedBombardment2', 'CaptureAssist2', 'EnhancedCoolshot1', 'CaptureAssist1', 'UAVRange1', 'ExtraUAV',
+  'ExtendedBombardment1', 'UAVTime', 'EnhancedNARC2', 'CaptureAssist4', 'EnhancedCoolshot2', 'CaptureAssist3',
+  'EnhancedNARC1', 'ConsumableSlot2', 'UAVRange2', 'ExpandedReserves', null, 'FlamerVentilation2',
+  'FlamerVentilation1', 'ConsumableSlot4', 'CoolantReserves', 'CoolshotCooldown', 'EnhancedSpotting', 'ConsumableSlot3',
+];
 
 export const SKILL_LABEL = {
   Cooldown: 'Cooldown', Range: 'Range', HeatGen: 'Heat Gen', Velocity: 'Velocity', LaserDuration: 'Laser Duration', FlamerVentilation: 'Flamer Ventilation',
@@ -106,17 +150,20 @@ export function pickSkills(ctx, frame, build, ev, role) {
 }
 
 export function skillCode(db, nodes) {
-  const order = db.skillNodes; if (!order?.length || order.length > CODE_BYTES * 8) return null;
-  const index = new Map(order.map((n, i) => [n.name, i]));
-  const bytes = new Uint8Array(CODE_BYTES);
-  for (const name of nodes) { const i = index.get(name); if (i === undefined) return null; bytes[i >> 3] |= 1 << (i & 7); }
-  return `a${[...bytes].map((b) => b.toString(16).padStart(2, '0')).join('')}`;
+  const known = new Set((db.skillNodes ?? []).map((n) => n.name));
+  const digits = new Array(CODE_BITS / 4).fill(0);
+  for (const name of nodes) {
+    const bit = SKILL_BITS.indexOf(name);
+    if (bit < 0 || (known.size && !known.has(name))) return null;
+    digits[bit >> 2] |= 8 >> (bit & 3);
+  }
+  return `a${digits.map((d) => d.toString(16)).join('')}`;
 }
 
-export function decodeSkillCode(db, code) {
+export function decodeSkillCode(code) {
   if (!/^a[0-9a-f]{60}$/i.test(code)) return null;
   const out = [];
-  db.skillNodes.forEach((n, i) => { if (parseInt(code.substr(1 + (i >> 3) * 2, 2), 16) & (1 << (i & 7))) out.push(n.name); });
+  for (let bit = 0; bit < CODE_BITS; bit++) if (parseInt(code[1 + (bit >> 2)], 16) & (8 >> (bit & 3))) out.push(SKILL_BITS[bit] ?? `?${bit}`);
   return out;
 }
 
