@@ -1,5 +1,6 @@
 import { load, esc, fmt, noData, titleCase } from '../store.js';
 import { mechFrame, evaluate, score, optimize, stockBuild, describeBuild, damageAt, precision, COMPONENTS, COMP_LABEL, TUNING } from '../lib/buildmath.js';
+import { buildCode, layoutSummary } from '../lib/buildcode.js';
 
 const ROLES = ['brawl', 'mid', 'long'];
 const ROLE_LABEL = { brawl: 'Brawl', mid: 'Mid range', long: 'Long range' };
@@ -137,18 +138,32 @@ function renderDetail() {
       root.querySelector('#optnote').textContent = `Tried ${r.evaluated.toLocaleString()} loadouts in ${((performance.now() - t) / 1000).toFixed(1)} s.`;
     }, 30);
   });
+  const cc = el.querySelector('#copycode');
+  if (cc) {
+    const field = el.querySelector('#codetext'); const note = el.querySelector('#copynote');
+    field.addEventListener('focus', () => field.select());
+    cc.addEventListener('click', async () => {
+      let ok = false;
+      try { await navigator.clipboard.writeText(cc.dataset.code); ok = true; } catch { field.focus(); field.select(); try { ok = document.execCommand('copy'); } catch { ok = false; } }
+      note.textContent = ok ? 'Copied. In the MechLab choose Loadout → Import and paste.' : 'Could not reach the clipboard: select the code and press Ctrl+C.';
+      cc.textContent = ok ? 'Copied ✓' : 'Copy build code';
+    });
+  }
   if (pick) drawRangeChart(el.querySelector('#rangechart'), pick, rows.find((r) => r.stock));
   attachMechView(el, mech, pick);
 }
 
 function detailCard(r, frame, stockEv, rows) {
   const { ctx } = S; const ev = r.ev; const b = r.build;
+  const bc = buildCode(ctx, frame, r);
+  const where = bc.layout ? layoutSummary(ctx, bc.layout) : [];
   const up = (id) => titleCase(ctx.upgrade.get(id)?.label ?? '');
   const byComp = {};
   ev.profiles.forEach((p, i) => { const c = ev.placement[i] ?? 'unplaced'; (byComp[c] ??= []).push(p); });
   const cmp = (v, s, d = 1, invert = false) => { if (!stockEv || r.stock) return ''; const diff = v - s; if (Math.abs(diff) < 0.05) return ''; const good = invert ? diff < 0 : diff > 0; return ` <span class="${good ? 'good' : 'bad'} small">${diff > 0 ? '+' : ''}${fmt(diff, d)}</span>`; };
   const sc = r.sc;
   return `<div class="card"><h3>${r.stock ? 'Stock loadout' : 'Selected build'} <span class="dim small">${esc(titleCase(r.title))}</span></h3>
+    ${bc.code ? `<div class="bar codebar"><button id="copycode" class="primary" data-code="${esc(bc.code)}">Copy build code</button><input type="text" id="codetext" readonly value="${esc(bc.code)}" /><span class="dim small" id="copynote">Paste it in the MechLab: Loadout → Import, with this variant selected.</span></div>` : `<p class="dim small">No build code: ${esc(bc.problem)}.</p>`}
     <div class="kv">
       <div><span>Alpha damage</span><b>${fmt(ev.alpha, 1)}${cmp(ev.alpha, stockEv?.alpha)}</b></div>
       <div><span>Alpha heat</span><b>${fmt(ev.alphaHeat, 1)} / ${fmt(ev.capacity, 0)}</b></div>
@@ -169,6 +184,7 @@ function detailCard(r, frame, stockEv, rows) {
         <table style="margin-top:6px"><tbody>${COMPONENTS.filter((c) => byComp[c]).map((c) => `<tr><td class="dim">${COMP_LABEL[c]}</td><td>${byComp[c].map((p) => `<span class="tag ${p.type}">${esc(titleCase(p.label))}</span>`).join('')}</td></tr>`).join('')}
           ${Object.entries(b.ammo ?? {}).length ? `<tr><td class="dim">Ammo</td><td>${Object.entries(b.ammo).map(([id, n]) => `<span class="tag">${n} t ${esc(titleCase(ctx.item.get(+id)?.label ?? id))}</span>`).join('')}</td></tr>` : ''}</tbody></table>
         ${ev.valid ? '' : `<p class="bad small">${ev.problems.map(esc).join('<br>')}</p>`}
+        ${where.length ? `<h2>Where it goes <span class="dim small">(what the build code contains)</span></h2><table><thead><tr><th>Location</th><th>Armor</th><th>Equipment</th></tr></thead><tbody>${where.map((w) => `<tr><td class="dim">${w.label}</td><td>${w.armor}</td><td class="small">${w.items.map((x) => esc(titleCase(x))).join(', ') || '<span class="dim">–</span>'}</td></tr>`).join('')}</tbody></table>` : ''}
         <h2>Why it scores ${fmt(sc.total, 1)}</h2>
         <div class="factors"><span>effective DPS <b>${fmt(sc.firepower, 2)}</b></span><span>× durability <b>${fmt(sc.durability, 2)}</b></span><span>× mobility <b>${fmt(sc.mobility, 2)}</b></span>
           <span>× alpha <b>${fmt(sc.alphaFactor, 2)}</b></span><span>× heat <b>${fmt(sc.heatFactor, 2)}</b></span><span>× ammo <b>${fmt(sc.ammoFactor, 2)}</b></span></div>
