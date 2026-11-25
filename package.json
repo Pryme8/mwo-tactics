@@ -1,0 +1,23 @@
+{
+  "name": "mwo-tactics",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Local tactical toolkit for MechWarrior Online: reads the installed game files, tracks stat changes per patch, rates builds, and renders maps and mechs in 3D.",
+  "scripts": {
+    "update": "node scanner/scan-data.mjs && node scanner/gen-builds.mjs && node scanner/scan-maps.mjs",
+    "scan": "node scanner/scan-data.mjs",
+    "builds": "node scanner/gen-builds.mjs",
+    "scan:maps": "node scanner/scan-maps.mjs",
+    "scan:mechs": "node scanner/scan-mechs.mjs",
+    "dev": "vite web",
+    "build": "vite build web",
+    "deploy": "node scripts/deploy.mjs"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  },
+  "dependencies": {
+    "@babylonjs/core": "^7.30.0"
+  }
+}
