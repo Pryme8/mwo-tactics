@@ -1,6 +1,7 @@
 import { load, esc, fmt, noData, titleCase } from '../store.js';
 import { mechFrame, evaluate, score, optimize, stockBuild, describeBuild, damageAt, precision, COMPONENTS, COMP_LABEL, TUNING } from '../lib/buildmath.js';
 import { buildCode, layoutSummary } from '../lib/buildcode.js';
+import { pickSkills, skillCode, skillSummary, MAX_NODES } from '../lib/skillcode.js';
 
 const ROLES = ['brawl', 'mid', 'long'];
 const ROLE_LABEL = { brawl: 'Brawl', mid: 'Mid range', long: 'Long range' };
@@ -138,17 +139,19 @@ function renderDetail() {
       root.querySelector('#optnote').textContent = `Tried ${r.evaluated.toLocaleString()} loadouts in ${((performance.now() - t) / 1000).toFixed(1)} s.`;
     }, 30);
   });
-  const cc = el.querySelector('#copycode');
-  if (cc) {
-    const field = el.querySelector('#codetext'); const note = el.querySelector('#copynote');
+  const copier = (btnSel, fieldSel, noteSel, done) => {
+    const cc = el.querySelector(btnSel); if (!cc) return;
+    const field = el.querySelector(fieldSel); const note = el.querySelector(noteSel); const label = cc.textContent;
     field.addEventListener('focus', () => field.select());
     cc.addEventListener('click', async () => {
       let ok = false;
       try { await navigator.clipboard.writeText(cc.dataset.code); ok = true; } catch { field.focus(); field.select(); try { ok = document.execCommand('copy'); } catch { ok = false; } }
-      note.textContent = ok ? 'Copied. In the MechLab choose Loadout → Import and paste.' : 'Could not reach the clipboard: select the code and press Ctrl+C.';
-      cc.textContent = ok ? 'Copied ✓' : 'Copy build code';
+      note.textContent = ok ? done : 'Could not reach the clipboard: select the code and press Ctrl+C.';
+      cc.textContent = ok ? 'Copied ✓' : label;
     });
-  }
+  };
+  copier('#copycode', '#codetext', '#copynote', 'Copied. In the MechLab choose Loadout → Import and paste.');
+  copier('#copyskill', '#skilltext', '#skillnote', 'Copied. Open the Skills screen of this mech, choose Import and paste, then check the tree before applying.');
   if (pick) drawRangeChart(el.querySelector('#rangechart'), pick, rows.find((r) => r.stock));
   attachMechView(el, mech, pick);
 }
@@ -157,6 +160,9 @@ function detailCard(r, frame, stockEv, rows) {
   const { ctx } = S; const ev = r.ev; const b = r.build;
   const bc = buildCode(ctx, frame, r);
   const where = bc.layout ? layoutSummary(ctx, bc.layout) : [];
+  const sk = pickSkills(ctx, frame, b, ev, ui.role);
+  const skCode = skillCode(ctx.db, sk.nodes);
+  const skRows = skillSummary(ctx, frame, sk);
   const up = (id) => titleCase(ctx.upgrade.get(id)?.label ?? '');
   const byComp = {};
   ev.profiles.forEach((p, i) => { const c = ev.placement[i] ?? 'unplaced'; (byComp[c] ??= []).push(p); });
@@ -184,6 +190,9 @@ function detailCard(r, frame, stockEv, rows) {
         <table style="margin-top:6px"><tbody>${COMPONENTS.filter((c) => byComp[c]).map((c) => `<tr><td class="dim">${COMP_LABEL[c]}</td><td>${byComp[c].map((p) => `<span class="tag ${p.type}">${esc(titleCase(p.label))}</span>`).join('')}</td></tr>`).join('')}
           ${Object.entries(b.ammo ?? {}).length ? `<tr><td class="dim">Ammo</td><td>${Object.entries(b.ammo).map(([id, n]) => `<span class="tag">${n} t ${esc(titleCase(ctx.item.get(+id)?.label ?? id))}</span>`).join('')}</td></tr>` : ''}</tbody></table>
         ${ev.valid ? '' : `<p class="bad small">${ev.problems.map(esc).join('<br>')}</p>`}
+        <h2>Skill tree <span class="dim small">${sk.total} / ${MAX_NODES} nodes for ${ROLE_LABEL[ui.role].toLowerCase()}</span></h2>
+        ${skCode ? `<div class="bar codebar"><button id="copyskill" data-code="${esc(skCode)}">Copy skill tree code</button><input type="text" id="skilltext" readonly value="${esc(skCode)}" /></div><div class="dim small" id="skillnote" style="margin:-6px 0 8px">Paste it in the mech's Skills screen with Import, and check the tree before applying.</div>` : ''}
+        <div>${skRows.map((x) => `<span class="tag" title="${esc(x.effect)}">${esc(x.label)} <b>${x.n}</b>/${x.of}${x.effect ? ` <span class="dim">${esc(x.effect)}</span>` : ''}</span>`).join('')}</div>
         ${where.length ? `<h2>Where it goes <span class="dim small">(what the build code contains)</span></h2><table><thead><tr><th>Location</th><th>Armor</th><th>Equipment</th></tr></thead><tbody>${where.map((w) => `<tr><td class="dim">${w.label}</td><td>${w.armor}</td><td class="small">${w.items.map((x) => esc(titleCase(x))).join(', ') || '<span class="dim">–</span>'}</td></tr>`).join('')}</tbody></table>` : ''}
         <h2>Why it scores ${fmt(sc.total, 1)}</h2>
         <div class="factors"><span>effective DPS <b>${fmt(sc.firepower, 2)}</b></span><span>× durability <b>${fmt(sc.durability, 2)}</b></span><span>× mobility <b>${fmt(sc.mobility, 2)}</b></span>

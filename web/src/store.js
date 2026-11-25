@@ -11,7 +11,6 @@ async function json(url) {
 }
 
 export async function load() {
-  if (state.ctx) return state;
   if (!state.loading) {
     state.loading = (async () => {
       state.index = await json(`${DATA}/index.json`).catch(() => null);

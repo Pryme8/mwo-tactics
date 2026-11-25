@@ -1,7 +1,7 @@
 // Field-level diff between two stat snapshots, so a patch reads as
 // "ClanERPPC  stats.heat  13.5 -> 14" rather than two big blobs.
 
-const IGNORE = new Set(['key', 'version', 'scannedAt']);
+const IGNORE = new Set(['key', 'version', 'scannedAt', 'skillNodes']);
 
 function flatten(value, prefix, out) {
   if (value === null || typeof value !== 'object') { out.set(prefix, value); return out; }

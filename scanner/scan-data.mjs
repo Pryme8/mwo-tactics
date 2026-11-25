@@ -281,8 +281,11 @@ const upgrades = scanUpgrades();
 const mechs = scanMechs();
 const { pods: omnipods, setBonuses } = scanOmnipods([...new Set(mechs.map((m) => m.chassis))]);
 const skills = scanSkills();
+// Node order of the skill tree screen. The in-game skill import code is a bit per node in
+// this order, so it has to be kept exactly as the file lists it.
+const skillNodes = find(xml('Libs/MechPilotTalents/MechSkillTreeNodesDisplay.xml'), 'Node').map((n) => ({ name: attr(n, 'name'), col: num(n, 'column'), row: num(n, 'row') }));
 
-const db = { weapons, ammo, engines, equipment, jumpjets, masc, internals, upgrades, mechs, omnipods, setBonuses, skills };
+const db = { weapons, ammo, engines, equipment, jumpjets, masc, internals, upgrades, mechs, omnipods, setBonuses, skills, skillNodes };
 for (const [k, v] of Object.entries(db)) console.log(`  ${k.padEnd(12)} ${v.length}`);
 
 // ---------- self-check: stock loadouts should weigh in at (or just under) max tonnage ----------
@@ -316,13 +319,16 @@ for (const [k, v] of Object.entries(db)) console.log(`  ${k.padEnd(12)} ${v.leng
 }
 
 // ---------- snapshot + diff ----------
-const hash = crypto.createHash('sha1').update(JSON.stringify(db)).digest('hex').slice(0, 10);
+const hash = crypto.createHash('sha1').update(JSON.stringify({ ...db, skillNodes: undefined })).digest('hex').slice(0, 10);
 const index = readJson(path.join(DATA_DIR, 'index.json'), { patches: [], latest: null });
 const prev = index.patches.find((p) => p.key === index.latest);
 const now = new Date().toISOString();
 
 if (prev && prev.hash === hash) {
   prev.lastSeen = now;
+  // Same stats, but keep the stored snapshot in step with what the scanner records now.
+  const stored = readJson(path.join(DATA_DIR, 'patches', prev.key, 'db.json'));
+  if (stored) writeJson(path.join(DATA_DIR, 'patches', prev.key, 'db.json'), { key: stored.key, version: stored.version, scannedAt: stored.scannedAt, ...db });
   writeJson(path.join(DATA_DIR, 'index.json'), index, true);
   console.log(`No stat changes since snapshot ${prev.key}.`);
 } else {
