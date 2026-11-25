@@ -2,9 +2,9 @@
 // into meta tiers. Output: data/patches/<key>/builds.json
 import path from 'node:path';
 import { readJson, writeJson, DATA_DIR } from './lib/game.mjs';
-import { indexDb, optimize, mechFrame, stockBuild, evaluate, score, describeBuild } from '../web/src/lib/buildmath.js';
+import { indexDb, optimize, mechFrame, stockBuild, evaluate, score, describeBuild, ROLES as BASE_ROLES, ALL_ROLES } from '../web/src/lib/buildmath.js';
 
-const ROLES = ['brawl', 'mid', 'long'];
+const ROLES = ALL_ROLES;
 const index = readJson(path.join(DATA_DIR, 'index.json'));
 if (!index?.latest) { console.error('No snapshot yet. Run: npm run scan'); process.exit(1); }
 const key = process.argv[2] || index.latest;
@@ -62,15 +62,15 @@ for (const m of db.mechs) {
   const e = mechs[m.id];
   const t = tiers[e.sameAs ?? m.id] ?? {};
   e.tiers = t;
-  const best = ROLES.map((r) => t[r]).filter(Boolean).sort((a, b) => 'SABC'.indexOf(a.tier) - 'SABC'.indexOf(b.tier) || b.rel - a.rel)[0];
+  const best = BASE_ROLES.map((r) => t[r]).filter(Boolean).sort((a, b) => 'SABC'.indexOf(a.tier) - 'SABC'.indexOf(b.tier) || b.rel - a.rel)[0];
   e.bestTier = best?.tier ?? null;
-  e.bestRole = best ? ROLES.find((r) => t[r] === best) : null;
+  e.bestRole = best ? BASE_ROLES.find((r) => t[r] === best) : null;
 }
 
 writeJson(path.join(DATA_DIR, 'patches', key, 'builds.json'), { key, generatedAt: new Date().toISOString(), roles: ROLES, mechs });
 const distinct = Object.values(mechs).filter((m) => !m.sameAs).length;
 console.log(`Builds for ${db.mechs.length} variants (${distinct} distinct frames) in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
-for (const wc of ['Light', 'Medium', 'Heavy', 'Assault']) for (const role of ROLES) {
+for (const wc of ['Light', 'Medium', 'Heavy', 'Assault']) for (const role of ROLES.filter((r) => !/^(brawl|mid|long)$/.test(r) && !/^(scout|stealth|support)+/.test(r))) {
   const top = db.mechs.filter((m) => m.weightClass === wc && mechs[m.id].tiers[role]?.rank <= 3 && !mechs[m.id].sameAs).sort((a, b) => mechs[a.id].tiers[role].rank - mechs[b.id].tiers[role].rank);
-  console.log(`  ${wc.padEnd(8)}${role.padEnd(6)} ${top.map((m) => `${m.variant} (${mechs[m.id].roles[role][0].title})`).join('  |  ')}`);
+  console.log(`  ${wc.padEnd(8)}${role.padEnd(15)} ${top.map((m) => `${m.variant} (${mechs[m.id].roles[role][0].title})`).join('  |  ')}`);
 }

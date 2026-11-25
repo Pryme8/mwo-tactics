@@ -107,13 +107,20 @@ function traits(ctx, build, ev) {
 
 // The order skill lines are bought in for a role. Each entry is [line, how many nodes];
 // the list is walked until the 91 nodes are spent, so later entries are the first to go.
-function wishes(role, t) {
+function wishes(asked, t) {
+  // the newer roles reuse a base pattern, with their own extras added below
+  const role = { sniper: 'long', scout: 'brawl', support: 'mid', stealth: 'mid' }[asked] ?? asked;
   const w = [['Cooldown', 16]];
   if (t.laser) w.push(['LaserDuration', 4]);
   if (t.uac) w.push(['UACJamChance', 2]);
   if (t.gauss) w.push(['GaussCharge', 2]);
   if (t.lbx) w.push(['LBXSpread', 2]);
   if (t.missile) w.push(['MissileSpread', 2]);
+  if (role === 'missile') w.push(['Range', 15], ['Velocity', 5], ['MissileRack', 2], ['TargetDecay', 5], ['SensorRange', 5], ['TargetInfoGathering', 5], ['HighExplosive', 2]);
+  if (asked === 'scout') w.push(['SpeedTweak', 5], ['RadarDeprivation', 5], ['SeismicSensor', 2], ['SensorRange', 5], ['TargetInfoGathering', 5]);
+  if (asked === 'sniper') w.push(['Range', 15], ['Velocity', 5], ['AdvancedZoom', 1]);
+  if (asked === 'stealth') w.push(['EnhancedECM', 2], ['RadarDeprivation', 5]);
+  if (asked === 'support') w.push(['HeatGen', 14], ['EnhancedECM', 2], ['AMSOverload', 2]);
   w.push(['CoolRun', 5], ['HeatContainment', 5]);
   if (t.hot) w.push(['HeatGen', 14]);
   if (role !== 'brawl') { w.push(['Range', 15]); if (t.projectile) w.push(['Velocity', 5]); }
@@ -121,7 +128,8 @@ function wishes(role, t) {
   if (!t.hot) w.push(['HeatGen', 8]);
   if (role === 'brawl') w.push(['SpeedTweak', 5], ['SeismicSensor', 2], ['TorsoSpeed', 6], ['KineticBurst', 7], ['RadarDeprivation', 5], ['Range', 6]);
   else w.push(['RadarDeprivation', 5], ['SpeedTweak', 5], ['SeismicSensor', 2]);
-  if (role === 'long') w.push(['AdvancedZoom', 1], ['SensorRange', 5]);
+  if (role === 'long' || role === 'missile') w.push(['AdvancedZoom', 1], ['SensorRange', 5]);
+  if (role === 'missile') w.push(['TargetRetention', 2]);
   if (t.lock) w.push(['TargetDecay', 5]);
   if (t.ecm) w.push(['EnhancedECM', 2]);
   if (t.projectile && role === 'brawl') w.push(['Velocity', 5]);

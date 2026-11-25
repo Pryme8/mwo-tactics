@@ -11,7 +11,11 @@ export const TUNING = {
   // extra heat per weapon fired past its free limit, as a fraction of (heat * penalty)
   ghostScale: [0, 0, 0.08, 0.18, 0.30, 0.45, 0.60, 0.80, 1.10, 1.50, 2.00, 3.00, 5.00],
   ammoSeconds: 110,              // sustained fire time builds are stocked for
-  roleRange: { brawl: 150, mid: 420, long: 720 },
+  roleRange: { brawl: 150, mid: 420, long: 720, sniper: 900, missile: 550, scout: 200, support: 500, stealth: 450 },
+  heatStableAt: 0.95,            // cooling / heat generated at which a build counts as heat stable
+  scoutMinKph: 105,              // slower than this (with skills) is not a scout
+  scoutRefKph: 125,
+  missileBoatOtherWeight: 0.25,  // how much non-missile weapons count on a missile boat
 };
 
 export const COMPONENTS = ['head', 'centre_torso', 'left_torso', 'right_torso', 'left_arm', 'right_arm', 'left_leg', 'right_leg'];
@@ -126,7 +130,9 @@ export function weaponProfile(w, qt = new Map()) {
 
 export function damageAt(p, dist) {
   const pts = p.pts;
-  if (dist >= pts[pts.length - 1].d) return pts[pts.length - 1].mod;
+  // past the last band nothing lands: missiles self-destruct at max range (their tables end at full damage)
+  if (dist > pts[pts.length - 1].d) return 0;
+  if (dist === pts[pts.length - 1].d) return pts[pts.length - 1].mod;
   for (let i = pts.length - 2; i >= 0; i--) {
     if (dist >= pts[i].d) {
       const a = pts[i]; const b = pts[i + 1];
@@ -299,10 +305,10 @@ export function evaluate(ctx, frame, build, opts = {}) {
     for (let k = limit; k <= g.length; k++) ghost += heat * pen * (TUNING.ghostScale[Math.min(k, TUNING.ghostScale.length - 1)] ?? 5);
   }
   const sustainFrac = hps > 0 ? Math.min(1, dissipation / hps) : 1;
-  const window = (T, dist) => {
+  const window = (T, dist, effOf = precision) => {
     // damage deliverable in T seconds from cold, staggering fire to avoid ghost heat
     let raw = 0; let eff = 0; let heatPerDmg = 0;
-    for (const p of profiles) { const m = damageAt(p, dist); const d = p.dps * m; raw += d; eff += d * precision(p, dist); }
+    for (const p of profiles) { const m = damageAt(p, dist); const d = p.dps * m; raw += d; eff += d * effOf(p, dist); }
     if (raw <= 0) return { raw: 0, eff: 0 };
     heatPerDmg = hps / Math.max(1e-6, dps);
     const first = profiles.reduce((a, p) => a + (p.continuous ? 0 : p.alpha * damageAt(p, dist)), 0);
@@ -337,6 +343,7 @@ export function evaluate(ctx, frame, build, opts = {}) {
     alpha, alphaHeat: alphaHeat + ghost, ghost, dps, hps, capacity, dissipation, sustainFrac, sustainedDps: dps * sustainFrac,
     alphasToOverheat: alphaHeat + ghost > 0 ? capacity / (alphaHeat + ghost) : Infinity,
     ammoSeconds, ehp, ctKill, kph, sideDeath, placement, profiles, window, ecm: !!ecm, engine,
+    stealthArmor: /stealth/i.test(upA?.name ?? ''), amsHardpoints: COMPONENTS.reduce((n, c) => n + (frame.comps[c]?.hardpoints.AMS ?? 0), 0),
     optimal: dps > 0 ? profiles.reduce((a, p) => a + p.optimal * p.dps, 0) / dps : 0,
   };
 }
@@ -345,25 +352,82 @@ export function evaluate(ctx, frame, build, opts = {}) {
 // One number per role so builds can be ranked. Each factor is reported so the UI can
 // show why a build rates the way it does.
 const CLASS_BASE = { Light: { ehp: 300, kph: 125 }, Medium: { ehp: 440, kph: 92 }, Heavy: { ehp: 580, kph: 76 }, Assault: { ehp: 760, kph: 60 } };
-export function score(frame, ev, role) {
+// Missile boats are judged on their missiles: lock-on launchers get full credit for the
+// damage they spread over a target (they can fire over cover on a team-mate's lock),
+// and everything else on the mech only counts as backup.
+function missileBoatShare(p, dist) {
+  if (p.type !== 'Missile') return precision(p, dist) * TUNING.missileBoatOtherWeight;
+  return p.lock ? 0.62 : precision(p, dist);
+}
+export const missileDpsAt = (ev, dist) => ev.profiles.reduce((a, p) => a + (p.type === 'Missile' ? p.dps * damageAt(p, dist) : 0), 0);
+
+// Snipers trade at extreme range from cover: only damage that arrives in one spot at
+// once is worth much, and lock-on missiles do not count at all.
+function sniperShare(p, dist) {
+  if (p.type === 'Missile' && p.lock) return 0;
+  const pinpoint = !p.continuous && p.burn === 0 && !(p.spread > 0) && p.shells === 1;
+  return precision(p, dist) * (pinpoint ? 1 : 0.7);
+}
+
+const ZERO = { total: 0, firepower: 0, durability: 0, mobility: 0, alphaFactor: 0, heatFactor: 0, ammoFactor: 0, burst: 0, sustain: 0 };
+const MOBILITY_EXP = { brawl: 0.55, mid: 0.4, long: 0.25, sniper: 0.2, missile: 0.2, scout: 1.2, support: 0.3, stealth: 0.45 };
+const BURST_WEIGHT = { sniper: 0.8, support: 0.2 };       // share of the score from the first 8 s (default 0.5)
+const ECM_BONUS = { scout: 1.2, support: 1.15, stealth: 1 };
+
+// A role key may end in '+stable': the same role, but builds that cannot keep firing
+// without building heat are marked down hard.
+export const STABLE = '+stable';
+export const baseRole = (key) => (key.endsWith(STABLE) ? key.slice(0, -STABLE.length) : key);
+
+export function score(frame, ev, roleKey) {
+  const role = baseRole(roleKey); const stable = role !== roleKey;
   const dist = TUNING.roleRange[role];
-  const burst = ev.window(8, dist); const sustain = ev.window(30, dist);
-  const firepower = 0.5 * burst.eff / 8 + 0.5 * sustain.eff / 30;                    // effective dps
+  if (role === 'missile' && missileDpsAt(ev, dist) <= 0) return ZERO;
+  if (role === 'stealth' && !ev.ecm) return ZERO;                      // stealth needs ECM (and stealth armor needs it too)
+  if (role === 'scout' && ev.kph < TUNING.scoutMinKph) return ZERO;
+  const effOf = role === 'missile' ? missileBoatShare : role === 'sniper' ? sniperShare : precision;
+  const burst = ev.window(8, dist, effOf); const sustain = ev.window(30, dist, effOf);
+  const wb = BURST_WEIGHT[role] ?? 0.5;
+  const firepower = wb * burst.eff / 8 + (1 - wb) * sustain.eff / 30;                // effective dps
+  if (!(firepower > 0)) return ZERO;
   const base = CLASS_BASE[frame.mech.weightClass];
-  const durability = Math.pow(ev.ehp / base.ehp, 0.45) * (ev.sideDeath ? 0.9 : 1) * (ev.ecm ? 1.08 : 1);
-  const mobility = Math.pow(Math.max(0.5, ev.kph / base.kph), role === 'brawl' ? 0.55 : role === 'mid' ? 0.4 : 0.25);
-  const alphaFactor = 0.8 + 0.2 * Math.min(1.5, ev.alpha / (base.ehp * 0.085));       // reward trade-winning alphas
-  const heatFactor = ev.alphaHeat > ev.capacity ? 0.6 : (ev.alphasToOverheat < 2 ? 0.88 : 1);
-  const ammoFactor = Number.isFinite(ev.ammoSeconds) ? Math.min(1, 0.6 + 0.4 * ev.ammoSeconds / 90) : 1;
+  let durability = Math.pow(ev.ehp / base.ehp, role === 'scout' ? 0.3 : 0.45) * (ev.sideDeath ? 0.9 : 1) * (ev.ecm ? ECM_BONUS[role] ?? 1.08 : 1);
+  if (role === 'stealth' && ev.stealthArmor) durability *= 1.2;        // cannot be targeted or locked while it is on
+  if (role === 'support') durability *= 1 + 0.04 * Math.min(3, ev.amsHardpoints);   // can carry AMS for the team
+  // scouts are measured against one speed for every weight class; everyone else against their class
+  const mobility = Math.pow(Math.max(0.5, ev.kph / (role === 'scout' ? TUNING.scoutRefKph : base.kph)), MOBILITY_EXP[role] ?? 0.3);
+  let alphaFactor = 0.8 + 0.2 * Math.min(1.5, ev.alpha / (base.ehp * 0.085));         // reward trade-winning alphas
+  if (role === 'sniper') {
+    const reach = ev.profiles.reduce((a, p) => a + (p.continuous || (p.type === 'Missile' && p.lock) ? 0 : p.alpha * damageAt(p, dist)), 0);
+    alphaFactor = 0.6 + 0.4 * Math.min(1.6, reach / (base.ehp * 0.085));
+  }
+  let heatFactor = ev.alphaHeat > ev.capacity ? 0.6 : (ev.alphasToOverheat < 2 ? 0.88 : 1);
+  if (role === 'support' || role === 'stealth') heatFactor *= 0.75 + 0.25 * ev.sustainFrac;   // has to keep firing / cannot cool while stealthed
+  if (stable) heatFactor *= Math.pow(Math.min(1, ev.sustainFrac / TUNING.heatStableAt), 3);
+  const ammoFactor = !Number.isFinite(ev.ammoSeconds) ? 1 : role === 'support' ? Math.min(1, 0.4 + 0.6 * ev.ammoSeconds / 110) : Math.min(1, 0.6 + 0.4 * ev.ammoSeconds / 90);
   const total = firepower * durability * mobility * alphaFactor * heatFactor * ammoFactor;
   return { total, firepower, durability, mobility, alphaFactor, heatFactor, ammoFactor, burst: burst.eff, sustain: sustain.eff };
 }
+
+export const ROLES = ['brawl', 'mid', 'long', 'sniper', 'missile', 'scout', 'support', 'stealth'];
+export const ROLE_LABEL = { brawl: 'Brawl', mid: 'Mid range', long: 'Long range', sniper: 'Sniper', missile: 'Missile boat', scout: 'Scout', support: 'Support', stealth: 'Stealth' };
+export const ALL_ROLES = [...ROLES, ...ROLES.map((r) => r + STABLE)];
+export const ROLE_NOTE = {
+  brawl: 'Close-range damage and the speed and armor to deliver it.',
+  mid: 'All-round trading at medium range.',
+  long: 'Sustained damage at long range.',
+  sniper: 'Pinpoint alpha strikes at 900 m. Front-loaded damage counts most, spread and beam-duration weapons are marked down, and lock-on missiles do not count.',
+  missile: 'Rated on missiles: lock-on launchers (LRM, ATM) get full credit for the damage they spread across a target, other weapons count as backup only.',
+  scout: 'Speed first: needs at least 105 kph, is measured against 125 kph whatever the weight class, and gets extra credit for ECM. Armor matters less.',
+  support: 'Keeps up steady fire at 500 m: sustained damage, cool running and deep ammo count most, with credit for ECM and AMS hardpoints.',
+  stealth: 'ECM is required. Inner Sphere builds are tried with Stealth Armor, which is credited for hiding the mech; heat efficiency matters because a stealthed mech cannot cool.',
+};
 
 // ---------------------------------------------------------------- optimizer
 const SPEED_TARGETS = { Light: [118, 138, 155], Medium: [82, 97, 113], Heavy: [65, 76, 88], Assault: [52, 61, 70] };
 
 export function optimize(ctx, mech, opts = {}) {
-  const { roles = ['brawl', 'mid', 'long'], keep = 4, skills = true, deadline = Infinity } = opts;
+  const { roles = ALL_ROLES, keep = 4, skills = true, deadline = Infinity } = opts;
   const frame = mechFrame(ctx, mech);
   const faction = mech.faction;
   const qt = quirkTable(skills ? [...frame.quirks, ...ctx.skillBonus[faction]] : frame.quirks);
@@ -380,7 +444,9 @@ export function optimize(ctx, mech, opts = {}) {
     const stdA = pick('Armor', (u) => /Standard/i.test(u.name));
     const ferro = pick('Armor', (u) => (faction === 'Clan' ? /^ClanFerro/i.test(u.name) : /^LightFerro/i.test(u.name)));
     const dhs = pick('HeatSink', (u) => /Double/i.test(u.name));
+    const stealth = faction !== 'Clan' && frame.canECM && roles.some((r) => baseRole(r) === 'stealth') ? pick('Armor', (u) => /Stealth/i.test(u.name)) : null;
     packages = [{ armorType: stdA.id, structureType: endo.id, heatSinkType: dhs.id }, { armorType: ferro.id, structureType: endo.id, heatSinkType: dhs.id }, { armorType: stdA.id, structureType: stdS.id, heatSinkType: dhs.id }];
+    if (stealth) packages.push({ armorType: stealth.id, structureType: endo.id, heatSinkType: dhs.id });
   }
   const engines = engineChoices(ctx, frame, SPEED_TARGETS[mech.weightClass]);
   if (!engines.length) return { frame, results: {} };
@@ -391,6 +457,7 @@ export function optimize(ctx, mech, opts = {}) {
 
   const best = Object.fromEntries(roles.map((r) => [r, []]));
   const consider = (role, entry) => {
+    if (!(entry.score.total > 0)) return;
     const list = best[role];
     const dup = list.findIndex((e) => e.key === entry.key);
     if (dup >= 0) { if (list[dup].score.total >= entry.score.total) return; list.splice(dup, 1); }
@@ -449,6 +516,7 @@ export function optimize(ctx, mech, opts = {}) {
   const pool = Object.fromEntries(roles.map((r) => [r, []]));
   const POOL = 28;
   const stage1 = (role, entry) => {
+    if (!(entry.score.total > 0)) return;
     const list = pool[role];
     if (list.length >= POOL && entry.score.total <= list[list.length - 1].score.total) return;
     list.push(entry); list.sort((a, b) => b.score.total - a.score.total); if (list.length > POOL) list.length = POOL;

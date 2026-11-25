@@ -4,8 +4,8 @@
 
 A site that reads your installed MechWarrior Online files and turns them into:
 
-- **Meta** – every mech's best generated build, ranked into S/A/B/C tiers per weight class and engagement range.
-- **Mechs & Builds** – hardpoints, quirks, generated build variations scored against each other and against stock, a damage-by-range chart, and a Babylon.js 3D view of the mech with the build's weapons mounted and a hit-location colouring.
+- **Meta** – every mech's best generated build, ranked into S/A/B/C tiers per weight class and role: brawl, mid range, long range, sniper, missile boat, scout, support and stealth. A *Heat stable* toggle re-ranks by builds that can fire non-stop without building heat.
+- **Mechs & Builds** – hardpoints, quirks, generated build variations scored against each other and against stock, a damage-by-range chart, and a Babylon.js 3D view of the mech with the build's weapons mounted and a hit-location colouring, plus one-click in-game import codes for the loadout and a matching skill tree.
 - **Weapons** – live weapon numbers (damage, DPS, heat, range, ghost-heat limits).
 - **Maps** – Babylon.js 3D viewer for every level: terrain with the in-game overhead image, all placed objects, the physics colliders as a toggle, invisible walls, spawns and objectives per game mode, free-fly and cockpit-height cameras.
 - **Patch Changes** – field-by-field diff between scans.

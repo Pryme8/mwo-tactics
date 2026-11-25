@@ -1,11 +1,10 @@
 import { load, esc, fmt, noData, titleCase } from '../store.js';
-import { mechFrame, evaluate, score, optimize, stockBuild, describeBuild, damageAt, precision, COMPONENTS, COMP_LABEL, TUNING } from '../lib/buildmath.js';
+import { mechFrame, evaluate, score, optimize, stockBuild, describeBuild, damageAt, precision, COMPONENTS, COMP_LABEL, TUNING, ROLES, ALL_ROLES, STABLE, ROLE_LABEL, ROLE_NOTE } from '../lib/buildmath.js';
 import { buildCode, layoutSummary } from '../lib/buildcode.js';
 import { pickSkills, skillCode, skillSummary, MAX_NODES } from '../lib/skillcode.js';
 
-const ROLES = ['brawl', 'mid', 'long'];
-const ROLE_LABEL = { brawl: 'Brawl', mid: 'Mid range', long: 'Long range' };
-const ui = { q: '', wc: 'All', faction: 'All', tier: 'All', id: null, role: 'brawl', pick: 0, skills: true, live: null };
+const ui = { q: '', wc: 'All', faction: 'All', tier: 'All', id: null, role: 'brawl', pick: 0, skills: true, stable: false, live: null };
+const roleKey = () => ui.role + (ui.stable ? STABLE : '');
 let root; let S; let mechView = null;
 
 export async function mount(el, rest) {
@@ -25,7 +24,7 @@ export async function mount(el, rest) {
 export function update(rest) {
   const [id, role] = rest ?? [];
   if (id && S.mechById.has(+id)) { ui.id = +id; ui.pick = 0; ui.live = null; }
-  if (ROLES.includes(role)) ui.role = role;
+  if (role) { const [base, flag] = decodeURIComponent(role).split('+'); if (ROLES.includes(base)) { ui.role = base; ui.stable = flag === 'stable'; } }
   if (!ui.id) ui.id = S.db.mechs.find((m) => S.builds?.mechs[m.id]?.bestTier === 'S')?.id ?? S.db.mechs[0].id;
   renderList(); renderDetail();
 }
@@ -47,7 +46,7 @@ function renderList() {
     return `<div class="item ${m.id === ui.id ? 'on' : ''}" data-id="${m.id}">${b?.bestTier ? `<span class="tier ${b.bestTier}">${b.bestTier}</span>` : '<span class="tier C">–</span>'}
       <span class="nm">${esc(titleCase(m.chassisLabel))} <small>${esc(m.variant)}</small></span><small>${m.tons}t</small></div>`;
   }).join('') || '<div class="empty">No mechs match.</div>';
-  el.querySelectorAll('.item').forEach((it) => it.addEventListener('click', () => { location.hash = `#/mechs/${it.dataset.id}/${ui.role}`; }));
+  el.querySelectorAll('.item').forEach((it) => it.addEventListener('click', () => { location.hash = `#/mechs/${it.dataset.id}/${roleKey()}`; }));
 }
 
 function quirkHtml(q) {
@@ -69,7 +68,7 @@ function buildsFor(mech) {
   if (ui.live) return ui.live;
   const entry = S.builds?.mechs[mech.id];
   const out = {};
-  for (const r of ROLES) out[r] = (entry?.roles[r] ?? []).map((p) => ({ title: p.title, build: unpack(p) }));
+  for (const r of ALL_ROLES) out[r] = (entry?.roles[r] ?? []).map((p) => ({ title: p.title, build: unpack(p) }));
   return out;
 }
 
@@ -83,9 +82,9 @@ function renderDetail() {
   const opts = { skills: ui.skills };
   const stock = stockBuild(ctx, frame);
   const stockEv = stock ? evaluate(ctx, frame, stock, opts) : null;
-  const list = all[ui.role] ?? [];
-  const rows = list.map((b) => { const ev = evaluate(ctx, frame, b.build, opts); return { ...b, ev, sc: score(frame, ev, ui.role) }; });
-  if (stockEv) rows.push({ title: describeBuild(ctx, stock), build: stock, ev: stockEv, sc: score(frame, stockEv, ui.role), stock: true });
+  const list = all[roleKey()] ?? [];
+  const rows = list.map((b) => { const ev = evaluate(ctx, frame, b.build, opts); return { ...b, ev, sc: score(frame, ev, roleKey()) }; });
+  if (stockEv) rows.push({ title: describeBuild(ctx, stock), build: stock, ev: stockEv, sc: score(frame, stockEv, roleKey()), stock: true });
   const pick = rows[Math.min(ui.pick, rows.length - 1)];
   const top = rows[0]?.sc.total || 1;
   const sameAs = entry?.sameAs && entry.sameAs !== mech.id ? S.mechById.get(entry.sameAs) : null;
@@ -111,8 +110,9 @@ function renderDetail() {
         <div class="small" style="margin-top:6px">${[['Head', '#ff4040'], ['CT', '#ffb826'], ['LT', '#4dbf66'], ['RT', '#4099ff'], ['Arms', '#8ce699'], ['Legs', '#bf80f2'], ['Rear', '#7a5a20']].map(([n, c]) => `<span style="color:${c};margin-right:9px">■ ${n}</span>`).join('')}</div></div>
     </div>
     <div class="card"><h3>Meta standing
-        ${ROLES.map((r) => { const t = entry?.tiers?.[r]; return t ? `<span class="tag">${ROLE_LABEL[r]}: <span class="tier ${t.tier}">${t.tier}</span> #${t.rank}/${t.of} in class</span>` : ''; }).join('')}</h3>
-      <div class="bar"><span class="seg">${ROLES.map((r) => `<button data-role="${r}" class="${ui.role === r ? 'on' : ''}">${ROLE_LABEL[r]} (${TUNING.roleRange[r]} m)</button>`).join('')}</span>
+        ${ROLES.map((r) => { const t = entry?.tiers?.[r + (ui.stable ? STABLE : '')]; return t ? `<span class="tag">${ROLE_LABEL[r]}: <span class="tier ${t.tier}">${t.tier}</span> #${t.rank}/${t.of} in class</span>` : ''; }).join('')}</h3>
+      <div class="bar"><span class="seg">${ROLES.map((r) => `<button data-role="${r}" class="${ui.role === r ? 'on' : ''}">${ROLE_LABEL[r]}</button>`).join('')}</span>
+        <button id="stable" class="${ui.stable ? 'on' : ''}" title="Prefer builds whose cooling keeps up with their heat, so they can fire without pausing">Heat stable</button>
         <button id="skills" class="${ui.skills ? 'on' : ''}">Skill tree bonuses</button>
         <button id="reopt" class="primary">Re-optimize now</button><span class="dim small" id="optnote">${ui.live ? 'Showing a fresh search run in your browser.' : ''}</span></div>
       ${rows.map((r, i) => `<div class="buildrow click" data-i="${i}" style="cursor:pointer;${i === ui.pick ? 'background:#1d262f;margin:0 -14px;padding-left:14px;padding-right:14px' : ''}">
@@ -122,19 +122,21 @@ function renderDetail() {
         <div class="factors"><span>${esc(titleCase(r.build.engine.label))}</span><span>alpha <b>${fmt(r.ev.alpha, 0)}</b></span><span>DPS <b>${fmt(r.ev.dps, 1)}</b></span>
           <span>sustained <b>${fmt(r.ev.sustainedDps, 1)}</b></span><span>heat/alpha <b>${Math.round((r.ev.alphaHeat / r.ev.capacity) * 100)}%</b></span><span><b>${fmt(r.ev.kph, 0)}</b> kph</span>
           <span>${r.ev.totalSinks} sinks</span>${r.ev.valid ? '' : `<span class="bad">${esc(r.ev.problems[0])}</span>`}</div></div>`).join('') || '<div class="dim">No generated builds for this mech.</div>'}
+      <p class="dim small" style="margin:8px 0 0"><b>${ROLE_LABEL[ui.role]}:</b> ${ROLE_NOTE[ui.role]}${ui.stable ? ' <b>Heat stable:</b> builds are marked down unless cooling covers at least 95% of the heat they make firing non-stop.' : ''}${!list.length ? ' This variant does not qualify, so it has no builds here.' : ''}</p>
     </div>
     ${pick ? detailCard(pick, frame, stockEv, rows) : ''}
   </div>`;
 
   el.querySelectorAll('button[data-role]').forEach((b) => b.addEventListener('click', () => { ui.role = b.dataset.role; ui.pick = 0; renderDetail(); }));
   el.querySelectorAll('.buildrow').forEach((b) => b.addEventListener('click', () => { ui.pick = +b.dataset.i; renderDetail(); }));
+  el.querySelector('#stable').addEventListener('click', () => { ui.stable = !ui.stable; ui.pick = 0; renderDetail(); });
   el.querySelector('#skills').addEventListener('click', () => { ui.skills = !ui.skills; renderDetail(); });
   el.querySelector('#reopt').addEventListener('click', () => {
     el.querySelector('#optnote').textContent = 'Searching…';
     setTimeout(() => {
       const t = performance.now();
-      const r = optimize(ctx, mech, { roles: ROLES, keep: 6, skills: ui.skills });
-      ui.live = Object.fromEntries(ROLES.map((role) => [role, r.results[role].map((e) => ({ title: describeBuild(ctx, e.build), build: e.build }))]));
+      const r = optimize(ctx, mech, { roles: ALL_ROLES, keep: 6, skills: ui.skills });
+      ui.live = Object.fromEntries(ALL_ROLES.map((role) => [role, r.results[role].map((e) => ({ title: describeBuild(ctx, e.build), build: e.build }))]));
       ui.pick = 0; renderDetail();
       root.querySelector('#optnote').textContent = `Tried ${r.evaluated.toLocaleString()} loadouts in ${((performance.now() - t) / 1000).toFixed(1)} s.`;
     }, 30);
