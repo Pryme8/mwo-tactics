@@ -2,6 +2,7 @@ import { load, esc, fmt, noData, titleCase } from '../store.js';
 import { mechFrame, evaluate, score, optimize, stockBuild, describeBuild, damageAt, precision, COMPONENTS, COMP_LABEL, TUNING, ROLES, ALL_ROLES, STABLE, ROLE_LABEL, ROLE_NOTE } from '../lib/buildmath.js';
 import { buildCode, layoutSummary } from '../lib/buildcode.js';
 import { pickSkills, skillCode, skillSummary, MAX_NODES } from '../lib/skillcode.js';
+import { CATS, quirkIndex, parseQuirk, valueText, isGood, standing } from '../lib/quirks.js';
 
 const ui = { q: '', wc: 'All', faction: 'All', tier: 'All', id: null, role: 'brawl', pick: 0, skills: true, stable: false, live: null };
 const roleKey = () => ui.role + (ui.stable ? STABLE : '');
@@ -49,14 +50,28 @@ function renderList() {
   el.querySelectorAll('.item').forEach((it) => it.addEventListener('click', () => { location.hash = `#/mechs/${it.dataset.id}/${roleKey()}`; }));
 }
 
-function quirkHtml(q) {
-  const mult = /_multiplier$/.test(q.name);
-  const label = q.name.replace(/_(multiplier|additive)$/, '').replace(/_/g, ' ');
-  // lower is better for these stats
-  const lowerBetter = /cooldown|heat(?!dissipation)|spread|duration|jamchance|jamduration|receiving|falldamage|screenshake|overheatdamage/.test(q.name) && !/minheatpenalty|maxheat/.test(q.name);
-  const good = lowerBetter ? q.value < 0 : q.value > 0;
-  const val = mult ? `${q.value > 0 ? '+' : ''}${(q.value * 100).toFixed(1).replace(/\.0$/, '')}%` : `${q.value > 0 ? '+' : ''}${q.value}`;
-  return `<span class="quirk ${good ? '' : 'neg'}">${esc(label)} ${val}</span>`;
+// The mech's quirks as bars: bar length is its value against the best any mech gets,
+// with its rank among the mechs that have the same bonus. Each row opens the full ranking.
+function quirksHtml(frame) {
+  const qi = quirkIndex(S);
+  const sum = new Map();
+  for (const q of frame.quirks) sum.set(q.name, (sum.get(q.name) ?? 0) + q.value);
+  const rows = [...sum].map(([name, v]) => ({ q: parseQuirk(name), v })).filter((x) => !x.q.hidden && x.v);
+  if (!rows.length) return '<span class="dim">None</span>';
+  let html = '';
+  for (const [cat, title] of CATS) {
+    const list = rows.filter((x) => x.q.cat === cat); if (!list.length) continue;
+    html += `<div class="qcat">${title}</div>`;
+    if (cat === 'ammo') { html += list.map((x) => `<span class="quirk">${esc(x.q.label.replace('Extra ammo: ', ''))} ${valueText(x.q, x.v)}</span>`).join(''); continue; }
+    html += list.map((x) => {
+      const st = standing(qi, x.q.name, x.v); const good = isGood(x.q, x.v);
+      const w = st ? Math.max(4, Math.min(100, (Math.abs(x.v) / Math.abs(st.best || x.v)) * 100)) : 100;
+      return `<a class="qmine" href="#/quirks/q/${encodeURIComponent(x.q.name)}" title="See every mech with this bonus">
+        <span class="nm">${esc(x.q.label)}</span><span class="qbar ${good ? '' : 'neg'}"><i style="width:${w}%"></i></span>
+        <span class="val ${good ? 'good' : 'bad'}">${valueText(x.q, x.v)}</span><span class="rk ${st && good && st.rank <= 3 ? 'top' : ''}">${st ? `#${st.rank} of ${st.of}` : ''}</span></a>`;
+    }).join('');
+  }
+  return html;
 }
 
 function unpack(packed) {
@@ -103,7 +118,7 @@ function renderDetail() {
     <div class="grid g2">
       <div class="card"><h3>Hardpoints</h3><div class="hp">${hp}</div>
         <h3 style="margin-top:12px">Quirks ${mech.omni ? '<span class="dim small">(with its own omnipod set)</span>' : ''}</h3>
-        <div>${frame.quirks.filter((q) => !/xpbonus|cbillbonus/.test(q.name)).map(quirkHtml).join('') || '<span class="dim">None</span>'}</div></div>
+        <div>${quirksHtml(frame)}</div><p class="dim small" style="margin:8px 0 0">Bars compare this mech with the best in the game for the same bonus. Click one for the full ranking.</p></div>
       <div class="card"><h3>3D view <span class="dim small" id="mv-note"></span></h3><canvas id="mechcanvas"></canvas>
         <div class="bar" style="margin:8px 0 0"><span class="seg" id="mv-mode"><button data-m="visual" class="on">Model</button><button data-m="hit">Hit locations</button></span>
         <span class="dim small">Drag to orbit · wheel to zoom · weapons of the selected build in orange</span></div>

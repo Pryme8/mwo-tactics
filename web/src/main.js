@@ -4,6 +4,7 @@ const views = {
   meta: () => import('./views/meta.js'),
   mechs: () => import('./views/mechs.js'),
   weapons: () => import('./views/weapons.js'),
+  quirks: () => import('./views/quirks.js'),
   maps: () => import('./views/maps.js'),
   changes: () => import('./views/changes.js'),
 };

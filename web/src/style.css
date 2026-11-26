@@ -80,3 +80,15 @@ canvas.chart { width: 100%; height: 150px; display: block; }
 
 .codebar { margin: 0 0 12px; }
 .codebar input { flex: 1 1 260px; min-width: 0; font-family: Consolas, monospace; font-size: 12px; }
+/* bonuses */
+.lhead { padding: 6px 12px; font-size: 11px; color: var(--accent); text-transform: uppercase; letter-spacing: .6px; background: #0d1115; border-bottom: 1px solid #1c232a; position: sticky; top: 0; }
+.qboard { padding: 4px 14px; }
+.qrow { display: grid; grid-template-columns: 34px minmax(190px, 1.1fr) 108px minmax(120px, 1fr) 62px; gap: 4px 10px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); color: var(--text); }
+.qrow:first-child { border-top: 0; } .qrow:hover { background: var(--panel2); }
+.qrow .rk { color: var(--dim); text-align: right; font-variant-numeric: tabular-nums; } .qrow .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qrow .val { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; } .qrow .more { grid-column: 2 / -1; font-size: 12px; }
+.qbar { height: 10px; background: #0b0e11; border-radius: 3px; overflow: hidden; } .qbar i { display: block; height: 100%; background: var(--good); } .qbar.neg i { background: var(--bad); }
+.qmine { display: grid; grid-template-columns: minmax(0, 1fr) 70px 54px 78px; gap: 3px 8px; align-items: center; padding: 3px 0; color: var(--text); font-size: 12px; }
+.qmine:hover { background: var(--panel2); } .qmine .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .qmine .val { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.qmine .rk { color: var(--dim); text-align: right; } .qmine .rk.top { color: var(--S); font-weight: 700; }
+.qcat { margin: 8px 0 2px; font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: .5px; }

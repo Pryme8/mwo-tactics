@@ -88,7 +88,7 @@ export function quirkTable(quirks) {
   return t;
 }
 
-function weaponScopes(w) {
+export function weaponScopes(w) {
   if (!w._scopes) w._scopes = [...new Set(['all', w.type.toLowerCase(), ...w.aliases.map((a) => a.toLowerCase())])];
   return w._scopes;
 }
