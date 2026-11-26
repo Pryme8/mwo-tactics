@@ -1,0 +1,15 @@
+{
+ "patches": [
+  {
+   "key": "1.4.343.0",
+   "version": "1.4.343.0",
+   "hash": "65b9034837",
+   "scannedAt": "2026-11-25T21:25:59.584Z",
+   "lastSeen": "2026-11-25T22:49:34.157Z",
+   "gameDataModified": "2026-10-28T23:42:06.319Z",
+   "previous": null,
+   "changeCount": 0
+  }
+ ],
+ "latest": "1.4.343.0"
+}

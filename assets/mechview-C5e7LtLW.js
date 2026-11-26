@@ -1,0 +1,2 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./mechscene-kFJqc-VM.js","./nativeXRFrame-U7dsaYgw.js","./index-Be1NVXtp.js","./index-BpABLkl9.css"])))=>i.map(i=>d[i]);
+import{k as i,D as s,_ as o}from"./index-Be1NVXtp.js";async function l(a,e,c){const t=await i(`${s}/mechs/${e.chassis}/mech.json`).catch(()=>null);if(!t)return null;const{buildMechScene:n}=await o(async()=>{const{buildMechScene:r}=await import("./mechscene-kFJqc-VM.js");return{buildMechScene:r}},__vite__mapDeps([0,1,2,3]),import.meta.url);return n(a,e,t,c)}export{l as createMechView};

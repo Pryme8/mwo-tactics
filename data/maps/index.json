@@ -1,0 +1,759 @@
+{
+ "build": "1.4.343.0",
+ "maps": [
+  {
+   "id": "alpinepeaks",
+   "label": "Alpinepeaks",
+   "size": 8192,
+   "hasMinimap": true,
+   "models": 235,
+   "objects": 3766,
+   "layers": [
+    "assault",
+    "conquest",
+    "domination",
+    "escort",
+    "incursion",
+    "main",
+    "scouting",
+    "skirmish",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "badlands",
+   "label": "Badlands",
+   "size": 4096,
+   "hasMinimap": true,
+   "models": 404,
+   "objects": 3448,
+   "layers": [
+    "invasion",
+    "main",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "bearclaw",
+   "label": "Bearclaw",
+   "size": 8192,
+   "hasMinimap": true,
+   "models": 123,
+   "objects": 3684,
+   "layers": [
+    "Assault",
+    "Conquest",
+    "Skirmish",
+    "domination",
+    "main",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "bismuth",
+   "label": "Bismuth",
+   "size": 8192,
+   "hasMinimap": true,
+   "models": 218,
+   "objects": 3009,
+   "layers": [
+    "Assault",
+    "Conquest",
+    "Main",
+    "Skirmish",
+    "domination",
+    "escort",
+    "incursion",
+    "main",
+    "scouting",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "canyonnetwork",
+   "label": "Canyonnetwork",
+   "size": 4096,
+   "hasMinimap": true,
+   "models": 170,
+   "objects": 16859,
+   "layers": [
+    "assault",
+    "conquest",
+    "domination",
+    "incursion",
+    "main",
+    "scouting",
+    "skirmish",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "capitolcity",
+   "label": "Capitol City",
+   "size": 8192,
+   "hasMinimap": true,
+   "models": 1057,
+   "objects": 84316,
+   "layers": [
+    "Assault",
+    "Conquest",
+    "Domination",
+    "Main",
+    "Scouting",
+    "Skirmish",
+    "TrainingGrounds",
+    "main"
+   ]
+  },
+  {
+   "id": "causticvalley",
+   "label": "Causticvalley",
+   "size": 4096,
+   "hasMinimap": true,
+   "models": 282,
+   "objects": 7149,
+   "layers": [
+    "assault",
+    "conquest",
+    "domination",
+    "incursion",
+    "main",
+    "scouting",
+    "skirmish",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "causticvalley_classic",
+   "label": "Causticvalley Classic",
+   "size": 4096,
+   "hasMinimap": true,
+   "models": 350,
+   "objects": 7012,
+   "layers": [
+    "assault",
+    "conquest",
+    "domination",
+    "incursion",
+    "main",
+    "scouting",
+    "skirmish",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "crater2",
+   "label": "Crater2",
+   "size": 8192,
+   "hasMinimap": true,
+   "models": 261,
+   "objects": 2783,
+   "layers": [
+    "assault",
+    "conquest",
+    "domination",
+    "escort",
+    "incursion",
+    "main",
+    "scouting",
+    "skirmish",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "crystals",
+   "label": "Crystals",
+   "size": 8192,
+   "hasMinimap": true,
+   "models": 338,
+   "objects": 1693,
+   "layers": [
+    "Invasion",
+    "Main",
+    "main",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "forestcolony",
+   "label": "Forestcolony",
+   "size": 8192,
+   "hasMinimap": true,
+   "models": 495,
+   "objects": 19389,
+   "layers": [
+    "assault",
+    "conquest",
+    "domination",
+    "escort",
+    "incursion",
+    "main",
+    "scouting",
+    "skirmish",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "forestcolony_classic",
+   "label": "Forestcolony Classic",
+   "size": 4096,
+   "hasMinimap": true,
+   "models": 254,
+   "objects": 5957,
+   "layers": [
+    "assault",
+    "conquest",
+    "main",
+    "skirmish",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "forestcolony_snow",
+   "label": "Forestcolony Snow",
+   "size": 4096,
+   "hasMinimap": true,
+   "models": 215,
+   "objects": 15816,
+   "layers": [
+    "assault",
+    "conquest",
+    "main",
+    "skirmish",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "frost",
+   "label": "Frost",
+   "size": 4096,
+   "hasMinimap": true,
+   "models": 159,
+   "objects": 1289,
+   "layers": [
+    "invasion",
+    "main",
+    "tod_sunset",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "frozencity",
+   "label": "Frozencity",
+   "size": 8192,
+   "hasMinimap": true,
+   "models": 332,
+   "objects": 6704,
+   "layers": [
+    "Assault",
+    "Conquest",
+    "Scouting",
+    "Skirmish",
+    "domination",
+    "escort",
+    "incursion",
+    "main",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "frozencity_classic",
+   "label": "Frozencity Classic",
+   "size": 4096,
+   "hasMinimap": true,
+   "models": 152,
+   "objects": 2122,
+   "layers": [
+    "assault",
+    "conquest",
+    "main",
+    "skirmish",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "frozencity_night",
+   "label": "Frozencity Night",
+   "size": 4096,
+   "hasMinimap": true,
+   "models": 155,
+   "objects": 2137,
+   "layers": [
+    "assault",
+    "conquest",
+    "domination",
+    "main",
+    "skirmish",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "gorge",
+   "label": "Gorge",
+   "size": 4096,
+   "hasMinimap": true,
+   "models": 126,
+   "objects": 1333,
+   "layers": [
+    "invasion",
+    "main",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "gorgeqp",
+   "label": "Gorge  (QP)",
+   "size": 4096,
+   "hasMinimap": true,
+   "models": 165,
+   "objects": 3298,
+   "layers": [
+    "assault",
+    "conquest",
+    "domination",
+    "main",
+    "skirmish",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "gorgeoasis",
+   "label": "Gorge Oasis",
+   "size": 4096,
+   "hasMinimap": true,
+   "models": 252,
+   "objects": 10660,
+   "layers": [
+    "assault",
+    "conquest",
+    "domination",
+    "main",
+    "skirmish",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "icelavanetwork",
+   "label": "Icelavanetwork",
+   "size": 4096,
+   "hasMinimap": true,
+   "models": 219,
+   "objects": 2586,
+   "layers": [
+    "assault",
+    "conquest",
+    "domination",
+    "incursion",
+    "main",
+    "scouting",
+    "skirmish",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "islandmetropolis",
+   "label": "Islandmetropolis",
+   "size": 4096,
+   "hasMinimap": true,
+   "models": 687,
+   "objects": 21714,
+   "layers": [
+    "assault",
+    "conquest",
+    "domination",
+    "escort",
+    "incursion",
+    "main",
+    "scouting",
+    "skirmish",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "lavaworld",
+   "label": "Lavaworld",
+   "size": 8192,
+   "hasMinimap": true,
+   "models": 304,
+   "objects": 4751,
+   "layers": [
+    "assault",
+    "conquest",
+    "domination",
+    "main",
+    "scouting",
+    "skirmish",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "lavaworldqp",
+   "label": "Lavaworld  (QP)",
+   "size": 8192,
+   "hasMinimap": true,
+   "models": 197,
+   "objects": 1306,
+   "layers": [
+    "assault",
+    "conquest",
+    "domination",
+    "main",
+    "skirmish",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "luthien",
+   "label": "Luthien",
+   "size": 4096,
+   "hasMinimap": true,
+   "models": 119,
+   "objects": 36054,
+   "layers": [
+    "assault",
+    "conquest",
+    "domination",
+    "main",
+    "skirmish",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "mechfactory",
+   "label": "Mechfactory",
+   "size": 4096,
+   "hasMinimap": true,
+   "models": 411,
+   "objects": 3005,
+   "layers": [
+    "assault",
+    "conquest",
+    "domination",
+    "main",
+    "scouting",
+    "skirmish",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "moonbase",
+   "label": "Moonbase",
+   "size": 4096,
+   "hasMinimap": true,
+   "models": 480,
+   "objects": 2858,
+   "layers": [
+    "assault",
+    "conquest",
+    "domination",
+    "incursion",
+    "main",
+    "skirmish",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "moonbase_classic",
+   "label": "Moonbase Classic",
+   "size": 4096,
+   "hasMinimap": true,
+   "models": 576,
+   "objects": 2511,
+   "layers": [
+    "assault",
+    "conquest",
+    "domination",
+    "incursion",
+    "main",
+    "skirmish",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "mountain",
+   "label": "Mountain",
+   "size": 4096,
+   "hasMinimap": true,
+   "models": 169,
+   "objects": 8726,
+   "layers": [
+    "Invasion",
+    "Main",
+    "main",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "mountainqp",
+   "label": "Mountain  (QP)",
+   "size": 4096,
+   "hasMinimap": true,
+   "models": 145,
+   "objects": 4013,
+   "layers": [
+    "Assault",
+    "Conquest",
+    "Domination",
+    "Main",
+    "Skirmish",
+    "main",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "polarhighlands",
+   "label": "Polarhighlands",
+   "size": 8192,
+   "hasMinimap": true,
+   "models": 194,
+   "objects": 5586,
+   "layers": [
+    "Main",
+    "assault",
+    "conquest",
+    "domination",
+    "escort",
+    "incursion",
+    "main",
+    "scouting",
+    "skirmish",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "polarhighlands_classic",
+   "label": "Polarhighlands Classic",
+   "size": 8192,
+   "hasMinimap": true,
+   "models": 173,
+   "objects": 5485,
+   "layers": [
+    "Main",
+    "assault",
+    "conquest",
+    "domination",
+    "escort",
+    "incursion",
+    "main",
+    "scouting",
+    "skirmish",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "private_1v1_a",
+   "label": "Private 1v1 A",
+   "size": 2048,
+   "hasMinimap": true,
+   "models": 258,
+   "objects": 15860,
+   "layers": [
+    "Main",
+    "main",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "private_1v1_b",
+   "label": "Private 1v1 B",
+   "size": 2048,
+   "hasMinimap": true,
+   "models": 127,
+   "objects": 6706,
+   "layers": [
+    "Main",
+    "main",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "private_1v1_c",
+   "label": "Private 1v1 C",
+   "size": 2048,
+   "hasMinimap": true,
+   "models": 168,
+   "objects": 8655,
+   "layers": [
+    "Main",
+    "main",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "private_1v1_d",
+   "label": "Private 1v1 D",
+   "size": 4096,
+   "hasMinimap": true,
+   "models": 63,
+   "objects": 569,
+   "layers": [
+    "Main",
+    "main",
+    "skirmish",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "private_2v2_a",
+   "label": "Private 2v2 A",
+   "size": 2048,
+   "hasMinimap": true,
+   "models": 91,
+   "objects": 282,
+   "layers": [
+    "Main",
+    "main",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "private_4v4_a",
+   "label": "Private 4v4 A",
+   "size": 4096,
+   "hasMinimap": true,
+   "models": 14,
+   "objects": 14,
+   "layers": [
+    "Main",
+    "main"
+   ]
+  },
+  {
+   "id": "private_ffa8p_a",
+   "label": "Private Ffa8p A",
+   "size": 4096,
+   "hasMinimap": true,
+   "models": 18,
+   "objects": 96,
+   "layers": [
+    "Main",
+    "main"
+   ]
+  },
+  {
+   "id": "rivercity",
+   "label": "Rivercity",
+   "size": 8192,
+   "hasMinimap": true,
+   "models": 648,
+   "objects": 14019,
+   "layers": [
+    "assault",
+    "conquest",
+    "domination",
+    "escort",
+    "incursion",
+    "main",
+    "scouting",
+    "skirmish",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "rivercity_tutorial",
+   "label": "Rivercity Tutorial",
+   "size": 8192,
+   "hasMinimap": true,
+   "models": 598,
+   "objects": 12316,
+   "layers": [
+    "Cinematics",
+    "academy",
+    "main"
+   ]
+  },
+  {
+   "id": "scrapyard",
+   "label": "Scrapyard",
+   "size": 4096,
+   "hasMinimap": true,
+   "models": 106,
+   "objects": 32112,
+   "layers": [
+    "assault",
+    "conquest",
+    "domination",
+    "main",
+    "skirmish",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "spacebase",
+   "label": "Spacebase",
+   "size": 8192,
+   "hasMinimap": true,
+   "models": 120,
+   "objects": 1262,
+   "layers": [
+    "Main",
+    "invasion",
+    "main",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "spacebaseqp",
+   "label": "Spacebase  (QP)",
+   "size": 8192,
+   "hasMinimap": true,
+   "models": 171,
+   "objects": 1844,
+   "layers": [
+    "Assault",
+    "Conquest",
+    "Domination",
+    "Main",
+    "Skirmish",
+    "main",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "terraceswamp",
+   "label": "Terraceswamp",
+   "size": 4096,
+   "hasMinimap": true,
+   "models": 620,
+   "objects": 12813,
+   "layers": [
+    "assault",
+    "conquest",
+    "domination",
+    "main",
+    "skirmish",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "tourmalinedesert",
+   "label": "Tourmalinedesert",
+   "size": 8192,
+   "hasMinimap": true,
+   "models": 241,
+   "objects": 2730,
+   "layers": [
+    "assault",
+    "conquest",
+    "domination",
+    "escort",
+    "incursion",
+    "main",
+    "scouting",
+    "skirmish",
+    "traininggrounds"
+   ]
+  },
+  {
+   "id": "tutorial_forestcolony",
+   "label": "Tutorial Forestcolony",
+   "size": 4096,
+   "hasMinimap": false,
+   "models": 251,
+   "objects": 10415,
+   "layers": [
+    "main"
+   ]
+  }
+ ]
+}
