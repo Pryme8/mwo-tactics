@@ -32,5 +32,5 @@ export const fmt = (v, d = 1) => (Number.isFinite(v) ? v.toFixed(d) : '–');
 export const noData = () => `<div class="empty">No game data has been scanned yet.<br>Run <code>npm run scan</code> then <code>npm run builds</code> in the project folder and reload.</div>`;
 
 export function titleCase(s) {
-  return String(s).toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase()).replace(/\b(Ac|Lrm|Srm|Mrm|Atm|Ppc|Er|Lb|Uac|Ams|Ecm|Xl|Iic|Ii|Iii|Hag|Rac|Lpl|Mpl)\b/g, (m) => m.toUpperCase());
+  return String(s).toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase()).replace(/\b(Ac|Lrm|Srm|Mrm|Atm|Ppc|Er|Lb|Uac|Ams|Ecm|Xl|Iic|Ii|Iii|Iv|Hag|Rac|Lpl|Mpl|Tag|Narc)\b/g, (m) => m.toUpperCase());
 }

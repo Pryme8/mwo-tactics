@@ -188,8 +188,9 @@ function detailCard(r, frame, stockEv, rows) {
     </div>
     <div class="grid g2" style="margin-top:12px">
       <div><h2 style="margin-top:0">Loadout</h2>
-        <div class="small">${esc(titleCase(b.engine.label))} · ${esc(up(b.structureType))} · ${esc(up(b.armorType))} (${Math.round(b.armorPct * 100)}% armor, ${fmt(ev.armorTons, 1)} t) · ${esc(up(b.heatSinkType))} × ${ev.totalSinks}${b.ecm ? ' · ECM' : ''}</div>
+        <div class="small">${esc(titleCase(b.engine.label))} · ${esc(up(b.structureType))} · ${esc(up(b.armorType))} (${Math.round(b.armorPct * 100)}% armor, ${fmt(ev.armorTons, 1)} t) · ${esc(up(b.heatSinkType))} × ${ev.totalSinks}${b.ecm ? ' · ECM' : ''}${b.artemis ? ' · Artemis IV' : ''}</div>
         <table style="margin-top:6px"><tbody>${COMPONENTS.filter((c) => byComp[c]).map((c) => `<tr><td class="dim">${COMP_LABEL[c]}</td><td>${byComp[c].map((p) => `<span class="tag ${p.type}">${esc(titleCase(p.label))}</span>`).join('')}</td></tr>`).join('')}
+          ${ev.gear.placed.length ? `<tr><td class="dim">Team gear</td><td>${ev.gear.placed.map((g) => `<span class="tag">${esc(titleCase(ctx.item.get(g.id)?.label ?? g.id))} <span class="dim">${COMP_LABEL[g.c]}</span></span>`).join('')}</td></tr>` : ''}
           ${Object.entries(b.ammo ?? {}).length ? `<tr><td class="dim">Ammo</td><td>${Object.entries(b.ammo).map(([id, n]) => `<span class="tag">${n} t ${esc(titleCase(ctx.item.get(+id)?.label ?? id))}</span>`).join('')}</td></tr>` : ''}</tbody></table>
         ${ev.valid ? '' : `<p class="bad small">${ev.problems.map(esc).join('<br>')}</p>`}
         <h2>Skill tree <span class="dim small">${sk.total} / ${MAX_NODES} nodes for ${ROLE_LABEL[ui.role].toLowerCase()}</span></h2>
@@ -198,7 +199,7 @@ function detailCard(r, frame, stockEv, rows) {
         ${where.length ? `<h2>Where it goes <span class="dim small">(what the build code contains)</span></h2><table><thead><tr><th>Location</th><th>Armor</th><th>Equipment</th></tr></thead><tbody>${where.map((w) => `<tr><td class="dim">${w.label}</td><td>${w.armor}</td><td class="small">${w.items.map((x) => esc(titleCase(x))).join(', ') || '<span class="dim">–</span>'}</td></tr>`).join('')}</tbody></table>` : ''}
         <h2>Why it scores ${fmt(sc.total, 1)}</h2>
         <div class="factors"><span>effective DPS <b>${fmt(sc.firepower, 2)}</b></span><span>× durability <b>${fmt(sc.durability, 2)}</b></span><span>× mobility <b>${fmt(sc.mobility, 2)}</b></span>
-          <span>× alpha <b>${fmt(sc.alphaFactor, 2)}</b></span><span>× heat <b>${fmt(sc.heatFactor, 2)}</b></span><span>× ammo <b>${fmt(sc.ammoFactor, 2)}</b></span></div>
+          <span>× alpha <b>${fmt(sc.alphaFactor, 2)}</b></span><span>× heat <b>${fmt(sc.heatFactor, 2)}</b></span><span>× ammo <b>${fmt(sc.ammoFactor, 2)}</b></span>${sc.gearFactor && sc.gearFactor !== 1 ? `<span>× team gear <b>${fmt(sc.gearFactor, 2)}</b></span>` : ''}</div>
         <p class="dim small">Effective DPS is damage landed on the aimed component over an 8 s burst and a 30 s fight at ${TUNING.roleRange[ui.role]} m, limited by heat. Spread, beam duration, missile behaviour and projectile travel time each reduce it.</p></div>
       <div><h2 style="margin-top:0">Damage by range <span class="dim small">(solid: this build · grey: stock)</span></h2><canvas class="chart" id="rangechart"></canvas>
         <table style="margin-top:8px"><thead><tr><th>Weapon</th><th class="num">Dmg</th><th class="num">DPS</th><th class="num">Heat/s</th><th class="num">Optimal</th><th class="num">Max</th></tr></thead><tbody>

@@ -65,9 +65,11 @@ export function layoutBuild(ctx, frame, build, ev) {
   for (let i = 0; i < build.weapons.length; i++) {
     const c = ev.placement[i]; const p = ev.profiles[i];
     if (!c) return { problem: `no hardpoint for ${p.label}` };
-    items[c].push(build.weapons[i]);
+    // with Artemis the launcher is a different item in the game
+    items[c].push((build.artemis && ctx.artemisOf.get(build.weapons[i])) || build.weapons[i]);
     free[c] -= p.slots + (build.artemis && ctx.weapon.get(p.id).stats.artemisAmmoType ? artemisSlots : 0);
   }
+  for (const g of ev.gear?.placed ?? []) { items[g.c].push(g.id); free[g.c] -= ctx.item.get(g.id)?.slots ?? 1; }
   if (COMPONENTS.some((c) => free[c] < 0)) return { problem: 'the weapons do not fit their components' };
 
   const put = (id, slots, prefer, what) => {

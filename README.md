@@ -53,4 +53,6 @@ These are not in the game's data files, so they live in `TUNING` at the top of `
 - Ghost heat scale table (penalty multiplier by number of weapons fired).
 - The scoring weights (how much durability, speed, alpha and range matter). The Mechs page shows each factor for every build, so a rating can always be traced.
 
-Not modelled yet: jump jets, MASC, AMS, Artemis/TAG/NARC bonuses, omnipod swapping (omnimechs use their own pod set), per-node skill tree choices (a full firepower/operations investment is assumed when "Skill tree bonuses" is on). Models are flat-coloured from each material's average texture colour rather than fully textured.
+Team equipment is modelled for the roles that use it: AMS, TAG and NARC add to support and stealth scores, TAG and NARC tighten a missile boat's own lock-on fire, Artemis IV is tried on every build with SRMs or LRMs, and missile boats always list their best Arrow IV option. The size of each bonus is a judgement call (`gearValue`, `tagLockBoost`, `artemisBoost` in `TUNING`).
+
+Not modelled yet: jump jets, MASC, laser AMS, omnipod swapping (omnimechs use their own pod set), per-node skill tree choices (a full firepower/operations investment is assumed when "Skill tree bonuses" is on). Models are flat-coloured from each material's average texture colour rather than fully textured.

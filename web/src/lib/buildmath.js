@@ -12,6 +12,15 @@ export const TUNING = {
   ghostScale: [0, 0, 0.08, 0.18, 0.30, 0.45, 0.60, 0.80, 1.10, 1.50, 2.00, 3.00, 5.00],
   ammoSeconds: 110,              // sustained fire time builds are stocked for
   roleRange: { brawl: 150, mid: 420, long: 720, sniper: 900, missile: 550, scout: 200, support: 500, stealth: 450 },
+  // Team equipment. Each number is the share added to a build's score in that role.
+  gearValue: {
+    support: { ams: 0.05, tag: 0.06, narc: 0.08 },
+    stealth: { ams: 0.02, tag: 0.08, narc: 0.08 },
+  },
+  maxAmsCredit: 3,
+  tagLockBoost: 0.12,            // own lock-on missiles land tighter on a TAGged target (missile boats)
+  narcLockBoost: 0.06,
+  artemisBoost: 1.15,            // Artemis: 30% tighter spread, counted as 15% more damage on the aimed component
   heatStableAt: 0.95,            // cooling / heat generated at which a build counts as heat stable
   scoutMinKph: 105,              // slower than this (with skills) is not a scout
   scoutRefKph: 125,
@@ -41,6 +50,17 @@ export function indexDb(db) {
   ctx.engines = db.engines.slice().sort((a, b) => a.rating - b.rating);
   ctx.upgradesOf = (cType, faction) => db.upgrades.filter((u) => u.cType === cType && (!u.faction.length || u.faction.includes(faction)));
   ctx.ecm = db.equipment.filter((e) => e.cType === 'CGECMStats');
+  // team equipment per faction, and the Artemis twin of each launcher (a separate item in the game)
+  const byName = new Map(db.weapons.map((w) => [w.name, w]));
+  const gearOf = (prefix) => {
+    const g = { ams: byName.get(prefix + 'AntiMissileSystem'), tag: byName.get(prefix + 'TAG'), narc: byName.get(prefix + 'NarcBeacon') };
+    g.amsAmmo = g.ams && ctx.ammoByType.get((g.ams.stats.ammoType ?? '').toLowerCase());
+    g.narcAmmo = g.narc && ctx.ammoByType.get((g.narc.stats.ammoType ?? '').toLowerCase());
+    return g;
+  };
+  ctx.gear = { InnerSphere: gearOf(''), Clan: gearOf('Clan') };
+  ctx.artemisOf = new Map();
+  for (const w of db.weapons) { const twin = byName.get(w.name + '_Artemis'); if (twin) ctx.artemisOf.set(w.id, twin.id); }
   ctx.skillBonus = { InnerSphere: skillBonuses(db, 'IS'), Clan: skillBonuses(db, 'Clan') };
   return ctx;
 }
@@ -83,7 +103,8 @@ function weaponMod(qt, w, stat, kind = 'multiplier') {
 export function weaponProfile(w, qt = new Map()) {
   const s = w.stats;
   // damage is per projectile: x pellets per shell (LB-X) x projectiles per trigger pull (missiles, clan AC bursts)
-  const perShot = (s.damage ?? 0) * (s.numPerShot || 1) * (s.numFiring || 1);
+  // splashPercent (Arrow IV): the blast also damages what is next to the impact
+  const perShot = (s.damage ?? 0) * (s.numPerShot || 1) * (s.numFiring || 1) * (1 + (s.splashPercent ?? 0));
   const oneShot = !!s.isOneShot;
   const cdMul = 1 + weaponMod(qt, w, 'cooldown');
   const heatMul = 1 + weaponMod(qt, w, 'heat');
@@ -153,6 +174,7 @@ export function precision(p, dist) {
   else if (p.continuous) f = 0.62;
   else if (p.shells > 1) f = 1 / (1 + (p.shells - 1) * 0.09);            // burst-fire autocannons walk across components
   else if (p.burn > 0) f = 1 / (1 + p.burn * 0.38);
+  if (p.artemis) f = Math.min(1, f * TUNING.artemisBoost);
   if (p.speed > 0 && !p.lock) f *= Math.min(1, Math.max(0.45, 1 - Math.max(0, dist / p.speed - 0.18) * 0.9));   // lead time
   return f;
 }
@@ -228,8 +250,16 @@ export function evaluate(ctx, frame, build, opts = {}) {
   const qt = opts.qt ?? quirkTable(opts.skills ? [...frame.quirks, ...ctx.skillBonus[mech.faction]] : frame.quirks);
   const cache = opts.cache;
   const profileOf = (id) => {
-    if (!cache) return weaponProfile(ctx.weapon.get(id), qt);
-    let p = cache.get(id); if (!p) { p = weaponProfile(ctx.weapon.get(id), qt); cache.set(id, p); } return p;
+    const w = ctx.weapon.get(id);
+    const art = build.artemis && w.stats.artemisAmmoType;
+    const key = art ? id + 'a' : id;
+    let p = cache?.get(key);
+    if (!p) {
+      p = weaponProfile(w, qt);
+      if (art) p = { ...p, artemis: true, ammoType: w.stats.artemisAmmoType, spread: p.spread * (ctx.upgrade.get(3050)?.artemisTypeStats?.missileSpread ?? 0.7) };
+      cache?.set(key, p);
+    }
+    return p;
   };
 
   // ---- weight
@@ -250,7 +280,10 @@ export function evaluate(ctx, frame, build, opts = {}) {
   const extSinks = build.heatSinks ?? 0;                // sinks the build adds (engine slots first, then components)
   const ecm = build.ecm ? ctx.ecm.find((e) => e.faction.includes(mech.faction)) : null;
   const fixedTons = COMPONENTS.reduce((t, c) => t + (frame.comps[c]?.fixed.reduce((a, id) => { const it = ctx.item.get(id); return a + (it && it.kind !== 'engine' && it.kind !== 'heatsink' ? it.tons ?? 0 : 0); }, 0) ?? 0), 0);
-  const tons = structureTons + armorTons + engine.tons + weaponTons + ammoTons + (extSinks + fixedSinks) * (sinkItem?.tons ?? 1) + (ecm?.tons ?? 0) + fixedTons;
+  const G = ctx.gear[mech.faction] ?? {}; const want = build.gear ?? {};
+  const gearIds = [...Array(want.ams ?? 0).fill(G.ams?.id), ...(want.tag ? [G.tag?.id] : []), ...Array(want.narc ?? 0).fill(G.narc?.id)].filter(Boolean);
+  const gearTons = gearIds.reduce((t, id) => t + (ctx.item.get(id)?.tons ?? 0), 0);
+  const tons = gearTons + structureTons + armorTons + engine.tons + weaponTons + ammoTons + (extSinks + fixedSinks) * (sinkItem?.tons ?? 1) + (ecm?.tons ?? 0) + fixedTons;
 
   // ---- slots
   const free = {}; let totalFree = 0;
@@ -271,6 +304,13 @@ export function evaluate(ctx, frame, build, opts = {}) {
     }
     if (!best) { valid = false; problems.push(`No ${p.type.toLowerCase()} hardpoint with ${need} free slots for ${p.label}`); continue; }
     hpLeft[best.c][p.type]--; free[best.c] -= need; placement[i] = best.c;
+  }
+  const gearPlaced = [];
+  for (const id of gearIds) {
+    const it = ctx.item.get(id);
+    const c = COMPONENTS.filter((x) => hpLeft[x][it.type] > 0 && free[x] >= it.slots).sort((a, b) => free[b] - free[a])[0];
+    if (!c) { valid = false; problems.push('No free ' + it.type + ' hardpoint for ' + it.label); continue; }
+    hpLeft[c][it.type]--; free[c] -= it.slots; gearPlaced.push({ id, c });
   }
   if (ecm) { const c = COMPONENTS.find((x) => free[x] >= ecm.slots && x !== 'head') ; if (c) free[c] -= ecm.slots; else { valid = false; problems.push('No room for ECM'); } }
   for (const c of COMPONENTS) { if (free[c] < 0) { valid = false; problems.push(`${COMP_LABEL[c]} is over its slot limit`); } totalFree += Math.max(0, free[c]); }
@@ -343,7 +383,8 @@ export function evaluate(ctx, frame, build, opts = {}) {
     alpha, alphaHeat: alphaHeat + ghost, ghost, dps, hps, capacity, dissipation, sustainFrac, sustainedDps: dps * sustainFrac,
     alphasToOverheat: alphaHeat + ghost > 0 ? capacity / (alphaHeat + ghost) : Infinity,
     ammoSeconds, ehp, ctKill, kph, sideDeath, placement, profiles, window, ecm: !!ecm, engine,
-    stealthArmor: /stealth/i.test(upA?.name ?? ''), amsHardpoints: COMPONENTS.reduce((n, c) => n + (frame.comps[c]?.hardpoints.AMS ?? 0), 0),
+    stealthArmor: /stealth/i.test(upA?.name ?? ''), artemis: artemisWeapons > 0,
+    gear: { ams: want.ams ?? 0, tag: !!want.tag, narc: want.narc ?? 0, placed: gearPlaced },
     optimal: dps > 0 ? profiles.reduce((a, p) => a + p.optimal * p.dps, 0) / dps : 0,
   };
 }
@@ -357,7 +398,7 @@ const CLASS_BASE = { Light: { ehp: 300, kph: 125 }, Medium: { ehp: 440, kph: 92 
 // and everything else on the mech only counts as backup.
 function missileBoatShare(p, dist) {
   if (p.type !== 'Missile') return precision(p, dist) * TUNING.missileBoatOtherWeight;
-  return p.lock ? 0.62 : precision(p, dist);
+  return p.lock ? Math.min(1, 0.62 * (p.artemis ? TUNING.artemisBoost : 1)) : precision(p, dist);
 }
 export const missileDpsAt = (ev, dist) => ev.profiles.reduce((a, p) => a + (p.type === 'Missile' ? p.dps * damageAt(p, dist) : 0), 0);
 
@@ -369,7 +410,7 @@ function sniperShare(p, dist) {
   return precision(p, dist) * (pinpoint ? 1 : 0.7);
 }
 
-const ZERO = { total: 0, firepower: 0, durability: 0, mobility: 0, alphaFactor: 0, heatFactor: 0, ammoFactor: 0, burst: 0, sustain: 0 };
+const ZERO = { total: 0, firepower: 0, durability: 0, mobility: 0, alphaFactor: 0, heatFactor: 0, ammoFactor: 0, gearFactor: 0, burst: 0, sustain: 0 };
 const MOBILITY_EXP = { brawl: 0.55, mid: 0.4, long: 0.25, sniper: 0.2, missile: 0.2, scout: 1.2, support: 0.3, stealth: 0.45 };
 const BURST_WEIGHT = { sniper: 0.8, support: 0.2 };       // share of the score from the first 8 s (default 0.5)
 const ECM_BONUS = { scout: 1.2, support: 1.15, stealth: 1 };
@@ -385,7 +426,8 @@ export function score(frame, ev, roleKey) {
   if (role === 'missile' && missileDpsAt(ev, dist) <= 0) return ZERO;
   if (role === 'stealth' && !ev.ecm) return ZERO;                      // stealth needs ECM (and stealth armor needs it too)
   if (role === 'scout' && ev.kph < TUNING.scoutMinKph) return ZERO;
-  const effOf = role === 'missile' ? missileBoatShare : role === 'sniper' ? sniperShare : precision;
+  const lockBoost = 1 + (ev.gear.tag ? TUNING.tagLockBoost : 0) + (ev.gear.narc ? TUNING.narcLockBoost : 0);
+  const effOf = role === 'missile' ? (p, d) => missileBoatShare(p, d) * (p.type === 'Missile' && p.lock ? lockBoost : 1) : role === 'sniper' ? sniperShare : precision;
   const burst = ev.window(8, dist, effOf); const sustain = ev.window(30, dist, effOf);
   const wb = BURST_WEIGHT[role] ?? 0.5;
   const firepower = wb * burst.eff / 8 + (1 - wb) * sustain.eff / 30;                // effective dps
@@ -393,7 +435,6 @@ export function score(frame, ev, roleKey) {
   const base = CLASS_BASE[frame.mech.weightClass];
   let durability = Math.pow(ev.ehp / base.ehp, role === 'scout' ? 0.3 : 0.45) * (ev.sideDeath ? 0.9 : 1) * (ev.ecm ? ECM_BONUS[role] ?? 1.08 : 1);
   if (role === 'stealth' && ev.stealthArmor) durability *= 1.2;        // cannot be targeted or locked while it is on
-  if (role === 'support') durability *= 1 + 0.04 * Math.min(3, ev.amsHardpoints);   // can carry AMS for the team
   // scouts are measured against one speed for every weight class; everyone else against their class
   const mobility = Math.pow(Math.max(0.5, ev.kph / (role === 'scout' ? TUNING.scoutRefKph : base.kph)), MOBILITY_EXP[role] ?? 0.3);
   let alphaFactor = 0.8 + 0.2 * Math.min(1.5, ev.alpha / (base.ehp * 0.085));         // reward trade-winning alphas
@@ -405,8 +446,10 @@ export function score(frame, ev, roleKey) {
   if (role === 'support' || role === 'stealth') heatFactor *= 0.75 + 0.25 * ev.sustainFrac;   // has to keep firing / cannot cool while stealthed
   if (stable) heatFactor *= Math.pow(Math.min(1, ev.sustainFrac / TUNING.heatStableAt), 3);
   const ammoFactor = !Number.isFinite(ev.ammoSeconds) ? 1 : role === 'support' ? Math.min(1, 0.4 + 0.6 * ev.ammoSeconds / 110) : Math.min(1, 0.6 + 0.4 * ev.ammoSeconds / 90);
-  const total = firepower * durability * mobility * alphaFactor * heatFactor * ammoFactor;
-  return { total, firepower, durability, mobility, alphaFactor, heatFactor, ammoFactor, burst: burst.eff, sustain: sustain.eff };
+  const gv = TUNING.gearValue[role];
+  const gearFactor = gv ? 1 + gv.ams * Math.min(TUNING.maxAmsCredit, ev.gear.ams) + (ev.gear.tag ? gv.tag : 0) + (ev.gear.narc ? gv.narc : 0) : 1;
+  const total = firepower * durability * mobility * alphaFactor * heatFactor * ammoFactor * gearFactor;
+  return { total, firepower, durability, mobility, alphaFactor, heatFactor, ammoFactor, gearFactor, burst: burst.eff, sustain: sustain.eff };
 }
 
 export const ROLES = ['brawl', 'mid', 'long', 'sniper', 'missile', 'scout', 'support', 'stealth'];
@@ -465,10 +508,13 @@ export function optimize(ctx, mech, opts = {}) {
     list.push(entry); list.sort((a, b) => b.score.total - a.score.total); if (list.length > keep * 3) list.length = keep * 3;
   };
 
-  const ammoFor = (picks) => {
+  const ammoFor = (picks, artemis) => {
     const ammo = {}; let tons = 0;
     const perType = new Map();
-    for (const { c, n } of picks) if (c.p.ammoType) { const k = c.p.ammoType.toLowerCase(); perType.set(k, (perType.get(k) ?? 0) + n * c.p.ammoPerShot / c.p.cycle); }
+    for (const { c, n } of picks) if (c.p.ammoType) {
+      const k = (artemis && c.w.stats.artemisAmmoType ? c.w.stats.artemisAmmoType : c.p.ammoType).toLowerCase();
+      perType.set(k, (perType.get(k) ?? 0) + n * c.p.ammoPerShot / c.p.cycle);
+    }
     for (const [k, perSec] of perType) {
       const a = ctx.ammoByType.get(k); if (!a || !a.numShots) return null;
       const n = Math.max(1, Math.min(8, Math.round((perSec * TUNING.ammoSeconds) / a.numShots)));
@@ -477,34 +523,76 @@ export function optimize(ctx, mech, opts = {}) {
     return { ammo, tons };
   };
 
+  // Team equipment and Artemis are only tried on the leaders (stage 2), and equipment only
+  // for the roles that value it, so a brawler is never handed a TAG it gets nothing for.
+  const G = ctx.gear[faction] ?? {};
+  const amsMax = Math.min(TUNING.maxAmsCredit, COMPONENTS.reduce((n, c) => n + (frame.comps[c]?.hardpoints.AMS ?? 0), 0));
+  const GEAR_ROLES = new Set(['support', 'stealth', 'missile']);
+  const gearRoles = roles.filter((r) => GEAR_ROLES.has(baseRole(r)));
+  const gearSets = [];
+  if (gearRoles.length) {
+    const ams = G.ams && amsMax > 0 ? amsMax : 0;
+    const tag = !!G.tag && hp.Energy > 0; const narc = G.narc && hp.Missile > 0 ? 1 : 0;
+    if (ams) gearSets.push({ ams, tag: false, narc: 0 });
+    if (tag) gearSets.push({ ams, tag: true, narc: 0 });
+    if (tag && ams) gearSets.push({ ams: 0, tag: true, narc: 0 });
+    if (narc) gearSets.push({ ams, tag, narc }, { ams: 0, tag: false, narc });
+  }
+
   let evaluated = 0;
   const evalOpts = { skills, qt, cache: new Map() };
-  const tryLoadout = (picks, engineList = engines, pkgList = packages, sinkFn = consider) => {
-    const weapons = []; let wTons = 0;
-    for (const { c, n } of picks) { for (let i = 0; i < n; i++) weapons.push(c.w.id); wTons += n * c.p.tons; }
-    const am = ammoFor(picks); if (!am) return;
-    const key = picks.map(({ c, n }) => `${n}x${c.w.id}`).sort().join('+');
-    for (const engine of engineList) for (const pkg of pkgList) {
-      const base = { engine, ...pkg, artemis: false, armorPct: 1, weapons, ammo: am.ammo, heatSinks: Math.max(0, 10 - engine.heatsinks), ecm: frame.canECM };
-      let ev = evaluate(ctx, frame, base, evalOpts);
-      evaluated++;
-      if (ev.freeTons < 0) {
-        // shave armour (up to 12%) before giving up
-        const perTon = ctx.upgrade.get(pkg.armorType)?.armorTypeStats?.armorPerTon ?? 32;
-        const shave = Math.ceil(-ev.freeTons * 2) / 2 * perTon / (ev.armorPts || 1);
-        if (shave > 0.12) continue;
-        base.armorPct = 1 - shave - 0.004; ev = evaluate(ctx, frame, base, evalOpts);
-        if (ev.freeTons < 0) continue;
+  const arrowBest = {};
+  // Artemis and team-equipment versions of a weapon mix, for the given roles
+  const extras = (picks, forRoles) => {
+    const out = [];
+    const canArtemis = picks.some(({ c }) => c.w.stats.artemisAmmoType);
+    const gr = forRoles.filter((r) => GEAR_ROLES.has(baseRole(r)));
+    if (canArtemis) out.push({ artemis: true, gear: null, roles: forRoles });
+    if (gr.length) for (const gear of gearSets) {
+      out.push({ artemis: false, gear, roles: gr });
+      if (canArtemis && gear.tag) out.push({ artemis: true, gear, roles: gr });
+    }
+    return out;
+  };
+  const tryLoadout = (picks, engineList = engines, pkgList = packages, sinkFn = consider, variantList = null) => {
+    const weapons = [];
+    for (const { c, n } of picks) for (let i = 0; i < n; i++) weapons.push(c.w.id);
+    const key = picks.map(({ c, n }) => n + 'x' + c.w.id).sort().join('+');
+    const leaders = sinkFn === consider;
+    const hasArrow = picks.some(({ c }) => /arrow/i.test(c.w.name));
+    const variants = variantList ?? [{ artemis: false, gear: null, roles }];
+    for (const v of variants) {
+      const am = ammoFor(picks, v.artemis); if (!am) continue;
+      const ammo = { ...am.ammo };
+      if (v.gear?.ams && G.amsAmmo) ammo[G.amsAmmo.id] = (ammo[G.amsAmmo.id] ?? 0) + 1;
+      if (v.gear?.narc && G.narcAmmo) ammo[G.narcAmmo.id] = (ammo[G.narcAmmo.id] ?? 0) + 1;
+      const vKey = (v.artemis ? 'a' : '') + (v.gear ? 'g' + v.gear.ams + (+v.gear.tag) + v.gear.narc : '');
+      for (const engine of engineList) for (const pkg of pkgList) {
+        const base = { engine, ...pkg, artemis: v.artemis, armorPct: 1, weapons, ammo, gear: v.gear ? { ...v.gear } : undefined, heatSinks: Math.max(0, 10 - engine.heatsinks), ecm: frame.canECM };
+        let ev = evaluate(ctx, frame, base, evalOpts);
+        evaluated++;
+        if (ev.freeTons < 0) {
+          // shave armour (up to 12%) before giving up
+          const perTon = ctx.upgrade.get(pkg.armorType)?.armorTypeStats?.armorPerTon ?? 32;
+          const shave = Math.ceil(-ev.freeTons * 2) / 2 * perTon / (ev.armorPts || 1);
+          if (shave > 0.12) continue;
+          base.armorPct = 1 - shave - 0.004; ev = evaluate(ctx, frame, base, evalOpts);
+          if (ev.freeTons < 0) continue;
+        }
+        // spend what is left on heat sinks, as far as slots allow
+        const sinkSlots = ctx.item.get(ctx.upgrade.get(pkg.heatSinkType)?.heatSinkTypeStats?.compatibleHeatSink)?.slots ?? 1;
+        const engineSlots = Math.max(0, Math.floor(engine.rating / 25) - 10 - frame.fixedEngineSinks);
+        const already = base.heatSinks;
+        const bySlots = Math.max(0, engineSlots - already) + Math.floor(Math.max(0, ev.slotsFree) / sinkSlots);
+        const add = Math.max(0, Math.min(Math.floor(ev.freeTons + 1e-6), bySlots, ev.hps > 0 ? 40 : 0));
+        if (add) { base.heatSinks += add; ev = evaluate(ctx, frame, base, evalOpts); }
+        if (!ev.valid) { if (add > 0) { base.heatSinks -= 1; ev = evaluate(ctx, frame, base, evalOpts); } if (!ev.valid) continue; }
+        for (const role of v.roles) {
+          const entry = { picks, key: [key, engine.id, pkg.armorType, pkg.structureType, vKey].join('|'), loadoutKey: key, build: { ...base, weapons: [...weapons], ammo: { ...ammo } }, ev, score: score(frame, ev, role) };
+          sinkFn(role, entry);
+          if (hasArrow && leaders && baseRole(role) === 'missile' && entry.score.total > (arrowBest[role]?.score.total ?? 0)) arrowBest[role] = entry;
+        }
       }
-      // spend what is left on heat sinks, as far as slots allow
-      const sinkSlots = ctx.item.get(ctx.upgrade.get(pkg.heatSinkType)?.heatSinkTypeStats?.compatibleHeatSink)?.slots ?? 1;
-      const engineSlots = Math.max(0, Math.floor(engine.rating / 25) - 10 - frame.fixedEngineSinks);
-      const already = base.heatSinks;
-      const bySlots = Math.max(0, engineSlots - already) + Math.floor(Math.max(0, ev.slotsFree) / sinkSlots);
-      const add = Math.max(0, Math.min(Math.floor(ev.freeTons + 1e-6), bySlots, ev.hps > 0 ? 40 : 0));
-      if (add) { base.heatSinks += add; ev = evaluate(ctx, frame, base, evalOpts); }
-      if (!ev.valid) { if (add > 0) { base.heatSinks -= 1; ev = evaluate(ctx, frame, base, evalOpts); } if (!ev.valid) continue; }
-      for (const role of roles) sinkFn(role, { picks, key: `${key}|${engine.id}|${pkg.armorType}|${pkg.structureType}`, loadoutKey: key, build: { ...base, weapons: [...weapons], ammo: { ...am.ammo } }, ev, score: score(frame, ev, role) });
     }
   };
 
@@ -550,6 +638,19 @@ export function optimize(ctx, mech, opts = {}) {
   const done = new Set();
   for (const role of roles) for (const e of pool[role]) { if (done.has(e.loadoutKey)) continue; done.add(e.loadoutKey); tryLoadout(e.picks); }
 
+  // Arrow IV: always worked out for missile boats, alone and with the best light backup weapon
+  if (roles.some((r) => baseRole(r) === 'missile')) {
+    const backup = cands.filter((c) => c.w.type !== 'Missile' && c.p.tons <= 2 && !c.p.ammoType).sort((a, b) => b.p.dps / Math.max(0.5, b.p.tons) - a.p.dps / Math.max(0.5, a.p.tons))[0];
+    for (const arrow of cands.filter((c) => /arrow/i.test(c.w.name))) {
+      for (let n = 1; n <= Math.min(hp.Missile, 3); n++) {
+        const missileRoles = roles.filter((r) => baseRole(r) === 'missile');
+        const sets = [[{ c: arrow, n }]];
+        if (backup) for (const k of [2, 4]) if (k <= hp[backup.w.type]) sets.push([{ c: arrow, n }, { c: backup, n: k }]);
+        for (const set of sets) { tryLoadout(set); tryLoadout(set, engines, packages, consider, extras(set, missileRoles)); }
+      }
+    }
+  }
+
   // second pass: fill leftover hardpoints on the leaders with light backup weapons
   const fillers = cands.filter((c) => c.p.tons <= 2 && !c.p.ammoType).sort((a, b) => b.p.dps / Math.max(0.5, b.p.tons) - a.p.dps / Math.max(0.5, a.p.tons)).slice(0, 4);
   for (const role of roles) {
@@ -566,11 +667,34 @@ export function optimize(ctx, mech, opts = {}) {
     }
   }
 
+  // third pass: Artemis and team equipment, tried on each role's leaders with the engine
+  // and upgrades that already won for them
+  const tried = new Set();
+  for (const role of roles) {
+    for (const e of best[role].slice(0, keep * 2)) {
+      const id = role + '|' + e.key;
+      if (tried.has(id) || e.build.artemis || e.build.gear) continue;
+      tried.add(id);
+      const list = extras(e.picks, [role]);
+      if (!list.length) continue;
+      // the extra weight may need the next engine down
+      const at = engines.indexOf(e.build.engine);
+      const lighter = engines.filter((x) => x.tons < e.build.engine.tons).sort((x, y) => y.tons - x.tons)[0];
+      tryLoadout(e.picks, at >= 0 && lighter ? [e.build.engine, lighter] : [e.build.engine], packages, consider, list);
+    }
+  }
+
   // de-duplicate by weapon mix (keep the best engine/upgrade variant of each)
   const results = {};
   for (const role of roles) {
     const seen = new Set(); results[role] = [];
     for (const e of best[role]) { if (seen.has(e.loadoutKey)) continue; seen.add(e.loadoutKey); results[role].push(e); if (results[role].length >= keep) break; }
+  }
+  // Arrow IV rarely wins on damage per ton, so a missile boat list always keeps its best Arrow build as an option.
+  for (const [role, e] of Object.entries(arrowBest)) {
+    const list = results[role]; if (!list?.length || list.some((x) => x.loadoutKey === e.loadoutKey)) continue;
+    if (list.length >= keep) list.pop();
+    list.push(e);
   }
   return { frame, results, evaluated };
 }
@@ -579,11 +703,17 @@ export function optimize(ctx, mech, opts = {}) {
 export function stockBuild(ctx, frame) {
   const s = frame.stock; if (!s || !s.armorType) return null;
   const weapons = []; const ammo = {}; let sinks = 0; let engine = frame.fixedEngine; let armor = 0; let ecm = false;
+  const gear = { ams: 0, tag: false, narc: 0 };
   for (const [, c] of Object.entries(s.components)) {
     armor += c.armor;
     for (const id of c.items) {
       const it = ctx.item.get(id); if (!it) continue;
-      if (it.kind === 'weapon') { if (WEAPON_TYPES.includes(it.type)) weapons.push(id); }
+      if (it.kind === 'weapon') {
+        if (it.type === 'AMS') gear.ams++;
+        else if (/TAG$/.test(it.name)) gear.tag = true;
+        else if (/NarcBeacon$/.test(it.name)) gear.narc++;
+        else if (WEAPON_TYPES.includes(it.type)) weapons.push(id);
+      }
       else if (it.kind === 'ammo') ammo[id] = (ammo[id] ?? 0) + 1;
       else if (it.kind === 'heatsink') sinks++;
       else if (it.kind === 'engine') engine = it;
@@ -592,11 +722,20 @@ export function stockBuild(ctx, frame) {
   }
   if (!engine) return null;
   let maxArmor = 0; for (const c of COMPONENTS) maxArmor += frame.comps[c]?.maxArmor ?? 0;
-  return { engine, armorType: s.armorType, structureType: s.structureType, heatSinkType: s.heatSinkType, artemis: s.artemis, armorPct: Math.min(1, armor / maxArmor), weapons, ammo, heatSinks: sinks, ecm };
+  return { engine, armorType: s.armorType, structureType: s.structureType, heatSinkType: s.heatSinkType, artemis: s.artemis, armorPct: Math.min(1, armor / maxArmor), weapons, ammo, heatSinks: sinks, ecm, gear };
+}
+
+export function gearText(build) {
+  const g = build.gear ?? {}; const out = [];
+  if (build.artemis) out.push('Artemis');
+  if (g.tag) out.push('TAG');
+  if (g.narc) out.push('NARC');
+  if (g.ams) out.push(g.ams > 1 ? g.ams + '× AMS' : 'AMS');
+  return out;
 }
 
 export function describeBuild(ctx, build) {
   const counts = new Map();
   for (const id of build.weapons) counts.set(id, (counts.get(id) ?? 0) + 1);
-  return [...counts].sort((a, b) => (ctx.weapon.get(b[0]).stats.tons ?? 0) * b[1] - (ctx.weapon.get(a[0]).stats.tons ?? 0) * a[1]).map(([id, n]) => `${n}× ${ctx.weapon.get(id).label}`).join(' + ');
+  return [...counts].sort((a, b) => (ctx.weapon.get(b[0]).stats.tons ?? 0) * b[1] - (ctx.weapon.get(a[0]).stats.tons ?? 0) * a[1]).map(([id, n]) => `${n}× ${ctx.weapon.get(id).label}`).join(' + ') + (gearText(build).length ? ' · ' + gearText(build).join(', ') : '');
 }

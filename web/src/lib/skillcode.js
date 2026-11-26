@@ -102,6 +102,7 @@ function traits(ctx, build, ev) {
   }
   t.hot = ev.hps > 0 ? ev.dissipation / ev.hps < 0.85 : false;
   t.ecm = !!build.ecm;
+  t.ams = (build.gear?.ams ?? 0) > 0; t.narc = (build.gear?.narc ?? 0) > 0;
   return t;
 }
 
@@ -120,7 +121,9 @@ function wishes(asked, t) {
   if (asked === 'scout') w.push(['SpeedTweak', 5], ['RadarDeprivation', 5], ['SeismicSensor', 2], ['SensorRange', 5], ['TargetInfoGathering', 5]);
   if (asked === 'sniper') w.push(['Range', 15], ['Velocity', 5], ['AdvancedZoom', 1]);
   if (asked === 'stealth') w.push(['EnhancedECM', 2], ['RadarDeprivation', 5]);
-  if (asked === 'support') w.push(['HeatGen', 14], ['EnhancedECM', 2], ['AMSOverload', 2]);
+  if (asked === 'support') w.push(['HeatGen', 14]);
+  if (t.ams) w.push(['AMSOverload', 2]);
+  if (t.narc) w.push(['EnhancedNARC', 2]);
   w.push(['CoolRun', 5], ['HeatContainment', 5]);
   if (t.hot) w.push(['HeatGen', 14]);
   if (role !== 'brawl') { w.push(['Range', 15]); if (t.projectile) w.push(['Velocity', 5]); }

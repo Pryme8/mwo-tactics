@@ -16,7 +16,7 @@ const pack = (e) => ({
   score: +e.score.total.toFixed(3),
   factors: { firepower: +e.score.firepower.toFixed(2), durability: +e.score.durability.toFixed(3), mobility: +e.score.mobility.toFixed(3), alpha: +e.score.alphaFactor.toFixed(3), heat: e.score.heatFactor, ammo: +e.score.ammoFactor.toFixed(3) },
   title: describeBuild(ctx, e.build),
-  build: { engine: e.build.engine.id, armorType: e.build.armorType, structureType: e.build.structureType, heatSinkType: e.build.heatSinkType, artemis: e.build.artemis, armorPct: +e.build.armorPct.toFixed(4), weapons: e.build.weapons, ammo: e.build.ammo, heatSinks: e.build.heatSinks, ecm: e.build.ecm },
+  build: { engine: e.build.engine.id, armorType: e.build.armorType, structureType: e.build.structureType, heatSinkType: e.build.heatSinkType, artemis: e.build.artemis, armorPct: +e.build.armorPct.toFixed(4), weapons: e.build.weapons, ammo: e.build.ammo, heatSinks: e.build.heatSinks, ecm: e.build.ecm, gear: e.build.gear },
 });
 
 // Many variants are reskins with identical stats: optimise each distinct frame once.
